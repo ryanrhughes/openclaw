@@ -14,6 +14,7 @@ export type HookMappingResolved = {
   name?: string;
   agentId?: string;
   sessionKey?: string;
+  sessionMode?: "isolated" | "persistent";
   messageTemplate?: string;
   textTemplate?: string;
   deliver?: boolean;
@@ -51,6 +52,7 @@ export type HookAction =
       agentId?: string;
       wakeMode: "now" | "next-heartbeat";
       sessionKey?: string;
+      sessionMode?: "isolated" | "persistent";
       deliver?: boolean;
       allowUnsafeExternalContent?: boolean;
       channel?: HookMessageChannel;
@@ -91,6 +93,7 @@ type HookTransformResult = Partial<{
   wakeMode: "now" | "next-heartbeat";
   name: string;
   sessionKey: string;
+  sessionMode: "isolated" | "persistent";
   deliver: boolean;
   allowUnsafeExternalContent: boolean;
   channel: HookMessageChannel;
@@ -209,6 +212,7 @@ function normalizeHookMapping(
     name: mapping.name,
     agentId: normalizeOptionalString(mapping.agentId),
     sessionKey: mapping.sessionKey,
+    sessionMode: mapping.sessionMode,
     messageTemplate: mapping.messageTemplate,
     textTemplate: mapping.textTemplate,
     deliver: mapping.deliver,
@@ -262,6 +266,7 @@ function buildActionFromMapping(
       agentId: mapping.agentId,
       wakeMode: mapping.wakeMode ?? "now",
       sessionKey: renderOptional(mapping.sessionKey, ctx),
+      sessionMode: mapping.sessionMode,
       deliver: mapping.deliver,
       allowUnsafeExternalContent: mapping.allowUnsafeExternalContent,
       channel: mapping.channel,
@@ -300,6 +305,7 @@ function mergeAction(
     name: override.name ?? baseAgent?.name,
     agentId: override.agentId ?? baseAgent?.agentId,
     sessionKey: override.sessionKey ?? baseAgent?.sessionKey,
+    sessionMode: override.sessionMode ?? baseAgent?.sessionMode,
     deliver: typeof override.deliver === "boolean" ? override.deliver : baseAgent?.deliver,
     allowUnsafeExternalContent:
       typeof override.allowUnsafeExternalContent === "boolean"
