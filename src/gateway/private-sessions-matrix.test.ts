@@ -8,7 +8,11 @@ import {
 } from "./local-user-ingress.js";
 import { createDirectChatContext } from "./server-chat.agent-events.test-helpers.js";
 import { loadSessionProfilePreferences } from "./session-profile-preferences.js";
-import { canReceiveSessionEvent, resolveSessionMutationAuthorization } from "./session-sharing.js";
+import {
+  canReceiveSessionEvent,
+  createProfileSessionEntryFilter,
+  resolveSessionMutationAuthorization,
+} from "./session-sharing.js";
 import { roleClient, rolePolicyConfig } from "./session-sharing.test-utils.js";
 import {
   directSessionReq,
@@ -196,7 +200,7 @@ test("private sessions outcome matrix", async () => {
         { client: profiles[profile], context },
       )
     ).payload?.sessions.some((session) => session.key === childKey) ?? false;
-  expect(await childListed("B")).toBe(true);
+  expect(await childListed("B"), "child listed B").toBe(true);
   expect(await childListed("C")).toBe(false);
   const childEvent = (profile: keyof typeof profiles) =>
     canReceiveSessionEvent({
@@ -206,8 +210,31 @@ test("private sessions outcome matrix", async () => {
       agentId: "main",
       event: "session.message",
     });
-  expect(childEvent("B")).toBe(true);
+  expect(childEvent("B"), "child event B").toBe(true);
   expect(childEvent("C")).toBe(false);
+  // Root membership carries through prepared role resolution (send/mutations) and mentions.
+  const childSend = (profile: keyof typeof profiles) =>
+    resolveSessionMutationAuthorization({
+      client: profiles[profile],
+      method: "chat.send",
+      requestParams: { sessionKey: childKey },
+      context: createDirectChatContext({ getRuntimeConfig: () => cfg }),
+    }).error === null;
+  expect(childSend("B"), "child send B").toBe(true);
+  expect(childSend("C"), "child send C").toBe(false);
+  // Mention eligibility owner: the mention target now carries privateAccessRoot.
+  const childEntry = {
+    createdActor: { type: "human" as const, source: "profile" as const, id: profileId("A") },
+    visibility: "draft" as const,
+    privateAccessRoot: sessionKey,
+  };
+  const childMention = (profile: keyof typeof profiles) =>
+    createProfileSessionEntryFilter({ profileId: profileId(profile), sessionCap: "write" })(
+      childKey,
+      childEntry,
+    );
+  expect(childMention("B"), "child mention B").toBe(true);
+  expect(childMention("C"), "child mention C").toBe(false);
 
   // Explicit-key reads are direct access for an admin who has not opted in, while lists
   // and events stay filtered (row D above).
