@@ -1567,6 +1567,7 @@ describe("spawnSubagentDirect seam flow", () => {
         createdVia: "spawn",
         createdActor: actor,
         visibility: "draft",
+        privateAccessRoot: parentSessionKey,
         parentSessionKey,
       });
     });

@@ -25,6 +25,14 @@ import {
 } from "./session-sharing-policy.js";
 import { loadCachedSessionSharingSnapshot } from "./session-sharing-snapshot-cache.js";
 
+/** Published membership snapshot only; unknown sessions or members fail closed. */
+function snapshotMember(sessionKey: string | undefined, identityId: string): boolean {
+  return (
+    sessionKey !== undefined &&
+    readSessionMembershipSnapshot({ sessionKey })?.includes(identityId) === true
+  );
+}
+
 function loadSharingSnapshot(params: Parameters<typeof resolveSessionSharingTarget>[0]) {
   const { sessionKey, agentId } = params;
   return loadCachedSessionSharingSnapshot({
@@ -43,6 +51,9 @@ function loadSharingSnapshot(params: Parameters<typeof resolveSessionSharingTarg
             ? target.entry.incognito === true || isIncognitoSessionKey(target.canonicalKey)
             : isIncognitoSessionKey(sessionKey),
           ...(target ? { createdActor: target.entry.createdActor } : {}),
+          ...(target?.entry.privateAccessRoot
+            ? { privateAccessRoot: target.entry.privateAccessRoot }
+            : {}),
         },
       };
     },
@@ -110,6 +121,7 @@ export function canReceiveSessionEvent(params: {
             ? target.entry.incognito === true || isIncognitoSessionKey(target.canonicalKey)
             : isIncognitoSessionKey(sessionKey),
           createdActor: target?.entry.createdActor,
+          privateAccessRoot: target?.entry.privateAccessRoot,
         }
       : loadSharingSnapshot({ cfg, ...lookup, sessionKey });
     const isCreator = sharing.isCreator(snapshot.createdActor);
@@ -123,9 +135,12 @@ export function canReceiveSessionEvent(params: {
     // Membership comes from prepared projection rows or the published snapshot, never a
     // store lookup; a none cap was rejected above for non-admins.
     const privateTarget = params.prepared ? resolveTarget(sessionKey) : null;
-    return privateTarget
-      ? sharing.isMember(privateTarget, identity.id)
-      : readSessionMembershipSnapshot({ sessionKey })?.includes(identity.id) === true;
+    return (
+      (privateTarget
+        ? sharing.isMember(privateTarget, identity.id)
+        : snapshotMember(sessionKey, identity.id)) ||
+      snapshotMember(snapshot.privateAccessRoot, identity.id)
+    );
   });
   if (!visible || event !== "session.suggestion") {
     return visible;
@@ -229,7 +244,7 @@ export function createSessionListEntryFilter(
 ):
   | ((
       sessionKey: string | undefined,
-      entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito">,
+      entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito" | "privateAccessRoot">,
       target?: SessionSharingTarget,
     ) => boolean)
   | undefined {
@@ -266,6 +281,7 @@ export function createSessionListEntryFilter(
       })?.includes(identity.id) === true
     );
   };
+  const rootMatches = (root: string | undefined) => snapshotMember(root, identity.id);
   return (sessionKey, entry, target) => {
     if (!admin && (entry.incognito === true || isIncognitoSessionKey(sessionKey))) {
       return false;
@@ -275,7 +291,8 @@ export function createSessionListEntryFilter(
     }
     return (
       creatorMatches(entry.createdActor) ||
-      ((admin || sessionCap !== "none") && memberMatches(sessionKey, target))
+      ((admin || sessionCap !== "none") &&
+        (memberMatches(sessionKey, target) || rootMatches(entry.privateAccessRoot)))
     );
   };
 }
@@ -291,12 +308,11 @@ export function createProfileSessionEntryFilter(
 ) {
   // Unprepared filters (notably preview) may survive yields and must read current aliases.
   const creatorMatches = isCreator ?? ((actor) => isSessionCreatorProfile(actor, params.profileId));
-  const memberMatches = (sessionKey: string | undefined) =>
-    sessionKey !== undefined &&
-    readSessionMembershipSnapshot({ sessionKey })?.includes(params.profileId) === true;
+  const memberMatches = (sessionKey: string | undefined, root: string | undefined) =>
+    snapshotMember(sessionKey, params.profileId) || snapshotMember(root, params.profileId);
   return (
     sessionKey: string | undefined,
-    entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito">,
+    entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito" | "privateAccessRoot">,
   ) => {
     const privateSession = resolveSessionVisibility(entry) === "draft";
     if (params.admin) {
@@ -304,14 +320,15 @@ export function createProfileSessionEntryFilter(
         !privateSession ||
         creatorMatches(entry.createdActor) ||
         profileShowsOthersPrivate(params.profileId) ||
-        memberMatches(sessionKey)
+        memberMatches(sessionKey, entry.privateAccessRoot)
       );
     }
     return (
       entry.incognito !== true &&
       !isIncognitoSessionKey(sessionKey) &&
       (creatorMatches(entry.createdActor) ||
-        (params.sessionCap !== "none" && (!privateSession || memberMatches(sessionKey))))
+        (params.sessionCap !== "none" &&
+          (!privateSession || memberMatches(sessionKey, entry.privateAccessRoot))))
     );
   };
 }

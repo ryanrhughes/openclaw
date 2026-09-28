@@ -213,10 +213,14 @@ export function resolveSessionSharingRole(
   const privateMember =
     params.isMember === undefined && resolveSessionVisibility(params.target.entry) === "draft"
       ? params.includeMembership !== false &&
-        readSessionMembershipSnapshot({
+        (readSessionMembershipSnapshot({
           sessionKey: params.target.storeKey,
           storePath: params.target.storePath,
-        })?.includes(identity.id) === true
+        })?.includes(identity.id) === true ||
+          (params.target.entry.privateAccessRoot !== undefined &&
+            readSessionMembershipSnapshot({
+              sessionKey: params.target.entry.privateAccessRoot,
+            })?.includes(identity.id) === true))
       : undefined;
   const member =
     params.isMember ??

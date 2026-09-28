@@ -193,6 +193,7 @@ const SESSION_ENTRY_RESERVED_SLOT_KEY_LIST = [
   "quotaSuspension",
   "pendingTranscriptRepair",
   "visibility",
+  "privateAccessRoot",
   "publicShare",
   "profileInvolvement",
 ] as const satisfies ReadonlyArray<

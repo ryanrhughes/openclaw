@@ -232,6 +232,10 @@ member can discover and read the private session, receive its events, and
 participate up to the member's `sessions.others` role cap. A `"none"` cap still
 rejects members. Non-members cannot discover it in lists. With `gateway.roles` configured they also cannot open it by key; without roles every identified profile shares one operator boundary, so private sessions stay out of other people's lists but remain openable by key, as in stock OpenClaw.
 
+Subagent sessions spawned from a private session stay private, keep the private parent's
+human creator, and record the private root session so its invited members keep access
+through nested children. ACP harness children follow the stock creation rules.
+
 Admins retain direct access to private sessions by key. By default, an admin
 with a durable profile does not see other people's private sessions in lists
 or receive their live events unless explicitly invited. Set that profile's
