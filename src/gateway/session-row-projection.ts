@@ -19,6 +19,7 @@ import { retainUserProfileCatalog } from "../state/user-profile-list.js";
 import type { readSessionRowFacts } from "./server-methods/session-placement-read-projection.js";
 import { ensureSessionGroupCatalog } from "./session-group-catalog.js";
 import { createSessionMembershipProjection } from "./session-membership-projection.js";
+import { publishSessionMembershipSnapshot } from "./session-membership-snapshot.js";
 import { createSessionProjectionDrain, yieldSessionListWork } from "./session-projection-work.js";
 import {
   createSessionRowMembershipReadAccess,
@@ -74,6 +75,7 @@ export async function createSessionRowProjection(params: {
   const rows = new Map<string, records.Row>();
   const creators = createSessionRowCreatorIndex();
   const membership = createSessionMembershipProjection();
+  publishSessionMembershipSnapshot(membership);
   const { invalidateRowMembership, readSessionRowEntry, createStoreRead } =
     createSessionRowEntryReadAccess(membership);
   let stores = new Map<string, records.SessionRowStore>();

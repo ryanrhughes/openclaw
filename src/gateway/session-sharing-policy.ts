@@ -25,6 +25,7 @@ import {
 } from "./server-methods/gateway-client-identity.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { isSessionCreatorProfile, prepareSessionCreatorProfile } from "./session-creator.js";
+import { readSessionMembershipSnapshot } from "./session-membership-snapshot.js";
 import {
   prepareGatewaySessionStoreTargetsReadOnly,
   resolveGatewaySessionStoreTargetsReadOnly,
@@ -215,8 +216,23 @@ export function resolveSessionSharingRole(
   if (sessionCap === "none") {
     return "viewer";
   }
+  // Private-session membership authorizes access, so it must come from prepared facts or the
+  // published membership snapshot rather than a synchronous store read.
+  const privateMember =
+    params.isMember === undefined && resolveSessionVisibility(params.target.entry) === "draft"
+      ? params.includeMembership !== false &&
+        (readSessionMembershipSnapshot({
+          sessionKey: params.target.storeKey,
+          storePath: params.target.storePath,
+        })?.includes(identity.id) === true ||
+          (params.target.entry.privateAccessRoot !== undefined &&
+            readSessionMembershipSnapshot({
+              sessionKey: params.target.entry.privateAccessRoot,
+            })?.includes(identity.id) === true))
+      : undefined;
   const member =
     params.isMember ??
+    privateMember ??
     (params.includeMembership !== false &&
       isSessionMember(
         {
@@ -445,10 +461,11 @@ export function authorizeSessionSharingTarget(
     return hiddenSessionNotFound(params.target.canonicalKey);
   }
   const capped = sessionCap === "view" || sessionCap === "suggest";
-  // Draft membership is inactive, while an explicit role caps even shared visibility.
+  // Explicit membership activates private sessions only within the operator role cap.
   const canMutate =
     visibility === "draft"
-      ? canManageSessionSharing(role)
+      ? canManageSessionSharing(role) ||
+        (role === "member" && (sessionCap === undefined || sessionCap === "write"))
       : role !== "viewer" || (visibility === "shared" && !capped);
   return canMutate
     ? null

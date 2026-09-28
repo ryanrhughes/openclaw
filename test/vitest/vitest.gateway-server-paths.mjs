@@ -84,6 +84,7 @@ export const gatewayDatabaseWorkerTestFiles = [
   "src/gateway/operator-approval-store.test.ts",
   "src/gateway/operator-approval-store.worker.test.ts",
   "src/gateway/probe.device-auth-scope.test.ts",
+  "src/gateway/private-sessions-matrix.test.ts",
   "src/gateway/server-methods/agent.create-event.test.ts",
   "src/gateway/server-methods/chat-send-commentary-media.test.ts",
   "src/gateway/server-methods/chat-send-synthetic-repair.integration.test.ts",

@@ -15,6 +15,7 @@ import {
   type InternalSessionEntry,
   type SessionFreshness,
 } from "../../config/sessions.js";
+import { resolveAgentMainSessionKey } from "../../config/sessions/main-session.js";
 import {
   patchSessionEntryTarget,
   type SessionEntryPatchOptions,
@@ -45,6 +46,7 @@ import type { AgentSessionPatchBuild } from "../server-methods/agent-session-pat
 import type { TrustedSessionCreation } from "../server-methods/session-creation-provenance.js";
 import type { GatewayOperatorRoleActor } from "../server-methods/shared-types.js";
 import type { GatewayRequestHandlerOptions } from "../server-methods/types.js";
+import { resolveNewSessionVisibility } from "../session-profile-preferences.js";
 import {
   cronContinuationHasReusableRuntime,
   emitAgentSendSessionLifecycleTransition,
@@ -130,6 +132,24 @@ export async function persistAgentSessionPhase(params: {
   setMainRestartRecoveryOwnerLease: (lease: MainSessionRecoveryOwnerLease) => void;
   respond: GatewayRequestHandlerOptions["respond"];
 }): Promise<AgentSessionPersistResult | undefined> {
+  const delegatedCreator =
+    !params.creation.actor &&
+    params.cfg.gateway?.roles &&
+    params.operatorRoleActor?.kind === "operator"
+      ? {
+          type: "human" as const,
+          source: "profile" as const,
+          id: params.operatorRoleActor.profileId,
+        }
+      : params.creation.actor;
+  const defaultVisibility = resolveNewSessionVisibility({
+    cfg: params.cfg,
+    creator: delegatedCreator,
+    explicit: params.initialSessionEntry?.visibility,
+    isMainSession:
+      params.canonicalSessionKey ===
+      resolveAgentMainSessionKey({ cfg: params.cfg, agentId: params.sessionAgentId }),
+  });
   let patchBuild = params.initialPatchBuild;
   let sessionEntry = params.initialSessionEntry;
   let resolvedSessionId = params.initialResolvedSessionId;
@@ -355,9 +375,16 @@ export async function persistAgentSessionPhase(params: {
               ? { ...lifecyclePatch, ...rotationLineage }
               : {
                   ...lifecyclePatch,
+                  // A delegated private default stamps the same operator it was resolved
+                  // for, like a newly required sandbox, so that person keeps access.
                   ...buildSessionCreationStamp(
-                    sandbox ? { ...delegatedCreation, sandbox } : params.creation,
+                    sandbox
+                      ? { ...delegatedCreation, sandbox }
+                      : defaultVisibility === "draft" && !params.creation.actor
+                        ? delegatedCreation
+                        : params.creation,
                   ),
+                  ...(defaultVisibility ? { visibility: defaultVisibility } : {}),
                 };
             createdNewEntry = freshEntry === undefined;
             const merged = withSqliteSessionFileMarker({

@@ -216,11 +216,42 @@ Single-user Gateways give unidentified operators one shared owner profile, inclu
 
 This state improves continuity. It is not an authorization or isolation boundary. Operator scopes still control actions, and a shared Gateway remains one trust domain for sessions, tools, credentials, and files.
 
-## Drafts
+## Private sessions
 
-Start a session as a draft to keep work in progress out of other people's sidebars until you publish it. Drafts are never hidden from admins, who see other people's drafts with a faded ghost marker. This is a coordination feature, not a security boundary.
+OpenClaw stores private sessions with the existing `draft` visibility. Set
+`session.sharing.defaultVisibility` to `"private"` to make new sessions created by
+verified Gateway profiles private by default. The default remains `"shared"`
+when the key is unset. A profile can override the Gateway default with the
+`sessions.defaultVisibility` preference (`"shared"` or `"private"`). Explicit
+create-time visibility still wins, and an agent's Home (`agent:<id>:main`)
+session always remains shared. Private defaults require
+`session.sharing.drafts` to remain enabled.
 
-Catalog listings and progress updates recheck current session visibility for each recipient. Cached provider results do not preserve access to a session that has become draft or incognito. An adopted thread remains bound to its original session instance and plugin ownership. Deleting and recreating a session key does not transfer the old thread to the new creator. Catalog reads and mutations also recheck the stored session after provider enumeration.
+The creator can invite another profile with session membership. An invited
+member can discover and read the private session, receive its events, and
+participate up to the member's `sessions.others` role cap. A `"none"` cap still
+rejects members. Non-members cannot discover it in lists. With `gateway.roles` configured they also cannot open it by key; without roles every identified profile shares one operator boundary, so private sessions stay out of other people's lists but remain openable by key, as in stock OpenClaw.
+
+Subagent sessions spawned from a private session stay private, keep the private parent's
+human creator, and record the private root session so its invited members keep access
+through nested children. ACP harness children follow the stock creation rules.
+
+Admins retain direct access to private sessions by key. By default, an admin
+with a durable profile does not see other people's private sessions in lists
+or receive their live events unless explicitly invited. Set that profile's
+`sessions.showOthersPrivate` preference to `true` to restore the complete admin
+list and event view. Profile-less admin connections retain the complete view.
+
+Catalog listings and progress updates recheck current session visibility for
+each recipient. Cached provider results do not preserve access to a session
+that has become private or incognito. An adopted thread remains bound to its
+original session instance and plugin ownership. Deleting and recreating a
+session key does not transfer the old thread to the new creator. Catalog reads
+and mutations also recheck the stored session after provider enumeration.
+
+Private sessions are a collaboration and sidebar-organization feature, not a
+security boundary. Use separate Gateways or agents when work requires tenant
+isolation.
 
 ## Turn attribution
 

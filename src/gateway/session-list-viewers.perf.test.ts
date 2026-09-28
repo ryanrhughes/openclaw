@@ -23,6 +23,7 @@ import {
 import type { GatewayClient } from "./server-methods/types.js";
 import { projectSessionPeople } from "./session-identity-projection.js";
 import type { SessionListDiagnostics, SessionListPhase } from "./session-list-diagnostics.types.js";
+import { applySessionProfilePreferenceChanges } from "./session-profile-preferences.js";
 import { retainSessionListForegroundWork } from "./session-projection-work.js";
 import { bindSessionRowProjection } from "./session-row-projection-access.js";
 import { createSessionRowProjection } from "./session-row-projection.js";
@@ -293,6 +294,10 @@ test("preserves viewer pages across publications while bounding shared predicate
       viewer(ensureProfileForEmail(`${name}@example.com`).id),
     );
     clients[2]!.connect.scopes = ["operator.admin"];
+    // The golden pages cover the complete admin view; admins opt into others' private rows.
+    applySessionProfilePreferenceChanges(clients[2]!.authenticatedUserProfile!.profileId, {
+      "sessions.showOthersPrivate": true,
+    });
     const entry = (sessionId: string, owner: number, updatedAt: number): SessionEntry => ({
       sessionId,
       updatedAt,

@@ -175,6 +175,19 @@ export function resolveSessionMutationAuthorization(params: {
         const sharing = prepareProjectedSessionSharing({
           cfg,
           client: params.client,
+          target: (sessionKey) => {
+            const record = projection.describe({ key: sessionKey, agentId: agent.agentId });
+            return record
+              ? {
+                  agentId: record.agentId,
+                  canonicalKey: record.key,
+                  entry: record.entry,
+                  storeKey: record.key,
+                  storeKeys: [record.key],
+                  storePath: record.storeTarget.storePath,
+                }
+              : null;
+          },
           isMember: (_target, identityId) => row?.membership.has(identityId) ?? false,
         });
         if (

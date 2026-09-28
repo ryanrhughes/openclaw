@@ -9,9 +9,10 @@ import {
 } from "./operator-role-policy.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { isSessionCreatorProfile, prepareSessionCreatorProfile } from "./session-creator.js";
+import { readSessionMembershipSnapshot } from "./session-membership-snapshot.js";
+import { profileShowsOthersPrivate } from "./session-profile-preferences.js";
 import {
   authorizeSessionSharingTarget,
-  canManageSessionSharing,
   isGatewayAdmin,
   resolveSessionSharingRole,
   resolveSessionSharingTarget,
@@ -21,6 +22,14 @@ import {
   type SessionSharingTarget,
 } from "./session-sharing-policy.js";
 import { loadCachedSessionSharingSnapshot } from "./session-sharing-snapshot-cache.js";
+
+/** Published membership snapshot only; unknown sessions or members fail closed. */
+function snapshotMember(sessionKey: string | undefined, identityId: string): boolean {
+  return (
+    sessionKey !== undefined &&
+    readSessionMembershipSnapshot({ sessionKey })?.includes(identityId) === true
+  );
+}
 
 function loadSharingSnapshot(params: Parameters<typeof resolveSessionSharingTarget>[0]) {
   const { sessionKey, agentId } = params;
@@ -40,6 +49,9 @@ function loadSharingSnapshot(params: Parameters<typeof resolveSessionSharingTarg
             ? target.entry.incognito === true || isIncognitoSessionKey(target.canonicalKey)
             : isIncognitoSessionKey(sessionKey),
           ...(target ? { createdActor: target.entry.createdActor } : {}),
+          ...(target?.entry.privateAccessRoot
+            ? { privateAccessRoot: target.entry.privateAccessRoot }
+            : {}),
         },
       };
     },
@@ -59,11 +71,12 @@ export function canReceiveSessionEvent(params: {
   };
 }): boolean {
   const { cfg, client, sessionKeys, event } = params;
-  if (isGatewayAdmin(client)) {
-    return true;
-  }
+  const admin = isGatewayAdmin(client);
   const operatorActor = resolveGatewayOperatorRoleActor(client);
   const identity = sharingIdentity(client, operatorActor);
+  if (admin && (!identity || profileShowsOthersPrivate(identity.id))) {
+    return true;
+  }
   if (!identity) {
     return (
       (!cfg.gateway?.roles || operatorActor?.kind === "system") &&
@@ -95,20 +108,26 @@ export function canReceiveSessionEvent(params: {
             ? target.entry.incognito === true || isIncognitoSessionKey(target.canonicalKey)
             : isIncognitoSessionKey(sessionKey),
           createdActor: target?.entry.createdActor,
+          privateAccessRoot: target?.entry.privateAccessRoot,
         }
       : loadSharingSnapshot({ ...lookup, sessionKey });
     const isCreator = sharing.isCreator(snapshot.createdActor);
-    if (snapshot.incognito || (hidesForeignSessions && !isCreator)) {
+    // Admins keep stock event access to non-private sessions; only others' private ones filter.
+    if ((snapshot.incognito && !admin) || (hidesForeignSessions && !isCreator && !admin)) {
       return false;
     }
     if (snapshot.visibility !== "draft" || isCreator) {
       return true;
     }
-    if (event !== "session.typing") {
-      return false;
-    }
-    const typingTarget = resolveTarget(sessionKey);
-    return typingTarget !== null && canManageSessionSharing(sharing.roleForTarget(typingTarget));
+    // Membership comes from prepared projection rows or the published snapshot, never a
+    // store lookup; a none cap was rejected above for non-admins.
+    const privateTarget = params.prepared ? resolveTarget(sessionKey) : null;
+    return (
+      (privateTarget
+        ? sharing.isMember(privateTarget, identity.id)
+        : snapshotMember(sessionKey, identity.id)) ||
+      snapshotMember(snapshot.privateAccessRoot, identity.id)
+    );
   });
   if (!visible || event !== "session.suggestion") {
     return visible;
@@ -133,6 +152,7 @@ export function prepareSessionSharing(
     aliases: ReadonlySet<string>;
     sessionCap: ReturnType<typeof operatorSessionCap>;
     isMember: (target: SessionSharingTarget, identityId: string) => boolean;
+    target?: (sessionKey: string) => SessionSharingTarget | null;
   },
 ) {
   const identity = sharingIdentity(params.client, resolveGatewayOperatorRoleActor(params.client));
@@ -142,14 +162,28 @@ export function prepareSessionSharing(
       {
         ...params,
         target,
+        // Prepared membership includes the private root so inherited-private children
+        // authorize root members the same way the list filter does.
         isMember:
-          isMember ?? (prepared && Boolean(identity && prepared.isMember(target, identity.id))),
+          isMember ??
+          (prepared &&
+            Boolean(
+              identity &&
+              (prepared.isMember(target, identity.id) ||
+                snapshotMember(target.entry.privateAccessRoot, identity.id)),
+            )),
       },
       prepared && { value: prepared.sessionCap },
       isCreator,
     );
   return {
     isCreator,
+    isMember: (target: SessionSharingTarget, identityId: string) =>
+      prepared?.isMember(target, identityId) ??
+      readSessionMembershipSnapshot({
+        sessionKey: target.storeKey,
+        storePath: target.storePath,
+      })?.includes(identityId) === true,
     sessionCap: prepared?.sessionCap,
     entryFilter: createSessionListEntryFilter(params, isCreator, prepared),
     roleForTarget,
@@ -165,8 +199,9 @@ export function prepareProjectedSessionSharing(params: {
   cfg: OpenClawConfig;
   client: GatewayClient | null;
   isMember: (target: SessionSharingTarget, identityId: string) => boolean;
+  target: (sessionKey: string) => SessionSharingTarget | null;
 }) {
-  const { cfg, client, isMember } = params;
+  const { cfg, client, isMember, target } = params;
   if (client?.internal?.syntheticClient) {
     prepareGatewayRecipientProfile(client);
   }
@@ -188,22 +223,34 @@ export function prepareProjectedSessionSharing(params: {
     aliases: profile?.aliases ?? new Set(),
     sessionCap,
     isMember,
+    target,
   });
 }
 
 export function createSessionListEntryFilter(
   params: Pick<SessionSharingRoleParams, "cfg" | "client">,
   isCreator?: ReturnType<typeof prepareSessionCreatorProfile>,
-  prepared?: { sessionCap: ReturnType<typeof operatorSessionCap> },
+  prepared?: {
+    sessionCap: ReturnType<typeof operatorSessionCap>;
+    isMember?: (target: SessionSharingTarget, identityId: string) => boolean;
+    target?: (sessionKey: string) => SessionSharingTarget | null;
+  },
+  options?: { adminDirectAccess?: boolean },
 ):
   | ((
       sessionKey: string | undefined,
-      entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito">,
+      entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito" | "privateAccessRoot">,
+      target?: SessionSharingTarget,
     ) => boolean)
   | undefined {
   const operatorActor = resolveGatewayOperatorRoleActor(params.client);
   const identity = sharingIdentity(params.client, operatorActor);
-  if (isGatewayAdmin(params.client) || (!identity && operatorActor?.kind === "system")) {
+  const admin = isGatewayAdmin(params.client);
+  if (
+    (admin &&
+      (options?.adminDirectAccess || !identity || profileShowsOthersPrivate(identity.id))) ||
+    (!identity && operatorActor?.kind === "system")
+  ) {
     return undefined;
   }
   if (!identity) {
@@ -212,21 +259,71 @@ export function createSessionListEntryFilter(
   const sessionCap = prepared
     ? prepared.sessionCap
     : params.cfg && operatorSessionCap(params.client, params.cfg);
-  return createProfileSessionEntryFilter({ profileId: identity.id, sessionCap }, isCreator);
+  const creatorMatches = isCreator ?? ((actor) => isSessionCreatorProfile(actor, identity.id));
+  const memberMatches = (sessionKey: string | undefined, target?: SessionSharingTarget) => {
+    if (!sessionKey) {
+      return false;
+    }
+    // Never query SQLite here: prepared projections or the published membership snapshot only.
+    const resolved = target ?? prepared?.target?.(sessionKey) ?? null;
+    if (resolved && prepared?.isMember) {
+      return prepared.isMember(resolved, identity.id);
+    }
+    return (
+      readSessionMembershipSnapshot({
+        sessionKey: resolved?.storeKey ?? sessionKey,
+        storePath: resolved?.storePath,
+      })?.includes(identity.id) === true
+    );
+  };
+  const rootMatches = (root: string | undefined) => snapshotMember(root, identity.id);
+  return (sessionKey, entry, target) => {
+    if (!admin && (entry.incognito === true || isIncognitoSessionKey(sessionKey))) {
+      return false;
+    }
+    if (resolveSessionVisibility(entry) !== "draft") {
+      return admin || sessionCap !== "none" || creatorMatches(entry.createdActor);
+    }
+    return (
+      creatorMatches(entry.createdActor) ||
+      ((admin || sessionCap !== "none") &&
+        (memberMatches(sessionKey, target) || rootMatches(entry.privateAccessRoot)))
+    );
+  };
 }
 
 export function createProfileSessionEntryFilter(
-  params: { profileId: string; sessionCap?: ReturnType<typeof operatorSessionCap> },
+  params: {
+    profileId: string;
+    sessionCap?: ReturnType<typeof operatorSessionCap>;
+    /** Admins keep every non-private session; others' private ones need membership or opt-in. */
+    admin?: boolean;
+  },
   isCreator?: ReturnType<typeof prepareSessionCreatorProfile>,
 ) {
   // Unprepared filters (notably preview) may survive yields and must read current aliases.
   const creatorMatches = isCreator ?? ((actor) => isSessionCreatorProfile(actor, params.profileId));
+  const memberMatches = (sessionKey: string | undefined, root: string | undefined) =>
+    snapshotMember(sessionKey, params.profileId) || snapshotMember(root, params.profileId);
   return (
     sessionKey: string | undefined,
-    entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito">,
-  ) =>
-    entry.incognito !== true &&
-    !isIncognitoSessionKey(sessionKey) &&
-    (creatorMatches(entry.createdActor) ||
-      (params.sessionCap !== "none" && resolveSessionVisibility(entry) !== "draft"));
+    entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito" | "privateAccessRoot">,
+  ) => {
+    const privateSession = resolveSessionVisibility(entry) === "draft";
+    if (params.admin) {
+      return (
+        !privateSession ||
+        creatorMatches(entry.createdActor) ||
+        profileShowsOthersPrivate(params.profileId) ||
+        memberMatches(sessionKey, entry.privateAccessRoot)
+      );
+    }
+    return (
+      entry.incognito !== true &&
+      !isIncognitoSessionKey(sessionKey) &&
+      (creatorMatches(entry.createdActor) ||
+        (params.sessionCap !== "none" &&
+          (!privateSession || memberMatches(sessionKey, entry.privateAccessRoot))))
+    );
+  };
 }

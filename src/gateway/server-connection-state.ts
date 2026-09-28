@@ -54,6 +54,10 @@ export function createGatewayConnectionState(params: {
               sharing: prepareProjectedSessionSharing({
                 cfg,
                 client,
+                target: (key) => {
+                  const scope = resolveSessionEventAgentScope(cfg, key, agentId);
+                  return scope?.[1] ? projection.sharingTarget({ key, agentId: scope[1] }) : null;
+                },
                 isMember: (target, identity) =>
                   projection.hasMembership(target.storePath, target.storeKey, identity),
               }),
@@ -152,7 +156,17 @@ export function createGatewayConnectionState(params: {
           session: row,
           ancestorSessions: ancestors?.every((ancestor) => projection.isCurrent(ancestor))
             ? ancestors.flatMap((ancestor) => {
-                if (presentation.sharing.entryFilter?.(ancestor.key, ancestor.entry) === false) {
+                if (
+                  presentation.sharing.entryFilter?.(
+                    ancestor.key,
+                    ancestor.entry,
+                    presentation.target({
+                      agentId: ancestor.agentId,
+                      key: ancestor.key,
+                      storePath: ancestor.storeTarget.storePath,
+                    }) ?? undefined,
+                  ) === false
+                ) {
                   return [];
                 }
                 const presented = presentation.present(ancestor, enrichment);

@@ -178,7 +178,8 @@ export async function handleChatHistoryRequest({
     const sharing = prepareSessionSharing({ client, cfg: current.cfg });
     if (
       current.entry
-        ? sharing.entryFilter?.(current.legacyKey ?? current.canonicalKey, current.entry) === false
+        ? !isGatewayAdmin(client) &&
+          sharing.entryFilter?.(current.legacyKey ?? current.canonicalKey, current.entry) === false
         : requestedSessionId && !retainedSessionId && !isGatewayAdmin(client)
     ) {
       respond(false, undefined, hiddenSessionNotFound(canonicalKey));

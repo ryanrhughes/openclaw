@@ -34,6 +34,11 @@ import { invalidateOperatorRolePolicy } from "../operator-role-policy.js";
 import { broadcastChatMetadataChanged } from "../server-chat-metadata-lifecycle.js";
 import { holdGatewayPolicyResponse } from "../server/ws-policy-close.js";
 import {
+  applySessionProfilePreferenceChanges,
+  GATEWAY_DEFAULT_VISIBILITY_PREFERENCE,
+  resolveGatewayDefaultSessionVisibility,
+} from "../session-profile-preferences.js";
+import {
   authenticatedProfileUnavailableError,
   isGatewayClientProfilePending,
 } from "./gateway-client-identity.js";
@@ -120,7 +125,7 @@ export const usersHandlers: GatewayRequestHandlers = {
       respond(false, undefined, profileError(error));
     }
   },
-  "users.prefs.get": async ({ client, params, respond }) => {
+  "users.prefs.get": async ({ client, context, params, respond }) => {
     if (!assertValidParams(params, validateUsersPrefsGetParams, "users.prefs.get", respond)) {
       return;
     }
@@ -134,18 +139,47 @@ export const usersHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const preferences = await getCanonicalUserPreferences(profileId, params.keys);
+      const wantsGatewayDefault = params.keys?.includes(GATEWAY_DEFAULT_VISIBILITY_PREFERENCE);
+      const storedKeys = params.keys?.filter(
+        (key) => key !== GATEWAY_DEFAULT_VISIBILITY_PREFERENCE,
+      );
+      const preferences = await getCanonicalUserPreferences(profileId, storedKeys);
       if (!preferences) {
         respond(false, undefined, authenticatedProfileUnavailableError());
         return;
       }
-      respond(true, { status: "ok", entries: preferences.entries }, undefined);
+      respond(
+        true,
+        {
+          status: "ok",
+          entries: {
+            ...preferences.entries,
+            ...(wantsGatewayDefault
+              ? {
+                  [GATEWAY_DEFAULT_VISIBILITY_PREFERENCE]: resolveGatewayDefaultSessionVisibility(
+                    context.getRuntimeConfig(),
+                  ),
+                }
+              : {}),
+          },
+        },
+        undefined,
+      );
     } catch (error) {
       respond(false, undefined, profileError(error));
     }
   },
   "users.prefs.set": async ({ client, context, params, respond }) => {
     if (!assertValidParams(params, validateUsersPrefsSetParams, "users.prefs.set", respond)) {
+      return;
+    }
+    const gatewayKey = Object.keys(params.entries).find((key) => key.startsWith("gateway."));
+    if (gatewayKey) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `users.prefs.set cannot write ${gatewayKey}`),
+      );
       return;
     }
     const profileId = client?.authenticatedUserProfile?.profileId ?? "";
@@ -199,6 +233,7 @@ export const usersHandlers: GatewayRequestHandlers = {
         );
         return;
       }
+      applySessionProfilePreferenceChanges(result.value.profileId, params.entries);
       respond(true, { status: "ok" }, undefined);
       publishUserPreferencesChanged(context, result.value.profileId, Object.keys(params.entries));
     } catch (error) {

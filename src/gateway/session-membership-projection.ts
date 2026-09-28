@@ -312,6 +312,18 @@ export function createSessionMembershipProjection(options: { env?: NodeJS.Proces
     const store = aliases.get(storePath);
     return !disposed && store ? (store.facts.get(sessionKey)?.[2] ?? noMembership) : undefined;
   }
+  function membershipForSessionKey(sessionKey: string) {
+    if (disposed) {
+      return undefined;
+    }
+    for (const store of new Set(aliases.values())) {
+      const fact = store.facts.get(sessionKey);
+      if (fact) {
+        return fact[2];
+      }
+    }
+    return undefined;
+  }
   function ready(storePath: string, sessionKey: string) {
     const store = aliases.get(storePath);
     return Boolean(
@@ -320,6 +332,7 @@ export function createSessionMembershipProjection(options: { env?: NodeJS.Proces
   }
   return {
     updateTargets,
+    membershipForSessionKey,
     invalidate,
     prepare,
     membership,

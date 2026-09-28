@@ -7,6 +7,7 @@ import { ensureProfileForEmail, setUserProfileRole } from "../state/user-profile
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
 import type { HumanMentionWebPush } from "./event-web-push.js";
 import { invalidateOperatorRolePolicy } from "./operator-role-policy.js";
+import { applySessionProfilePreferenceChanges } from "./session-profile-preferences.js";
 
 const {
   listDevicePairingMock,
@@ -601,6 +602,13 @@ describe("event Web Push classification", () => {
           const owner = ensureProfileForEmail("draft-owner@example.test");
           const recipient = ensureProfileForEmail("draft-admin@example.test");
           setUserProfileRole(recipient.id, "admin");
+          if (scenario === "eligible admin") {
+            // Durable preference reads need the host broker, which this worker project lacks;
+            // publish the opt-in the way users.prefs.set does.
+            applySessionProfilePreferenceChanges(recipient.id, {
+              "sessions.showOthersPrivate": true,
+            });
+          }
           let cfg: OpenClawConfig = {
             gateway: {
               roles: {

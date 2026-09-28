@@ -1,12 +1,15 @@
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { validateSessionsDescribeParams } from "../../../packages/gateway-protocol/src/index.js";
+import type { SessionEntry } from "../../config/sessions.js";
 import { hasOperatorBoundary } from "../operator-role-policy.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
 import { prepareProjectedSessionPresentation } from "../session-row-presentation.js";
 import { getSessionRowProjection } from "../session-row-projection-access.js";
+import type { SessionSharingTarget } from "../session-sharing-policy.js";
 import {
   authorizeIncognitoSessionTarget,
   createSessionListEntryFilter,
+  isGatewayAdmin,
 } from "../session-sharing.js";
 import { readRecentSessionMessagesWithStatsAsync } from "../session-transcript-readers.js";
 import { loadSessionEntriesForTarget, requireSessionKey } from "./sessions-shared.js";
@@ -57,8 +60,13 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
           const record = read.describe(query);
           if (
             !record ||
-            (presentation.sharing.sessionCap !== undefined &&
-              presentation.sharing.entryFilter?.(record.key, record.entry) === false)
+            (!isGatewayAdmin(client ?? null) &&
+              presentation.sharing.sessionCap !== undefined &&
+              presentation.sharing.entryFilter?.(
+                record.key,
+                record.entry,
+                presentation.target(query) ?? undefined,
+              ) === false)
           ) {
             respond(true, { session: null });
             return;
@@ -107,9 +115,15 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       agentId: requestedAgent.agentId,
     });
     const boundaryFilter = hasOperatorBoundary(client, cfg)
-      ? createSessionListEntryFilter({ client, cfg })
+      ? createSessionListEntryFilter({ client, cfg }, undefined, undefined, {
+          adminDirectAccess: true,
+        })
       : undefined;
-    if (!entry?.sessionId || boundaryFilter?.(target.canonicalKey, entry) === false) {
+    if (
+      !entry?.sessionId ||
+      boundaryFilter?.(target.canonicalKey, entry, sharingTargetFor(target, storePath, entry)) ===
+        false
+    ) {
       respond(true, { messages: [] }, undefined);
       return;
     }
@@ -142,7 +156,9 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
         })
       : null;
     const currentBoundaryFilter = hasOperatorBoundary(client, currentCfg)
-      ? createSessionListEntryFilter({ client, cfg: currentCfg })
+      ? createSessionListEntryFilter({ client, cfg: currentCfg }, undefined, undefined, {
+          adminDirectAccess: true,
+        })
       : undefined;
     if (
       !current ||
@@ -150,7 +166,12 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       current.target.canonicalKey !== target.canonicalKey ||
       current.storePath !== storePath ||
       current.entry?.sessionId !== sessionId ||
-      currentBoundaryFilter?.(current.target.canonicalKey, current.entry) === false
+      (current.entry !== undefined &&
+        currentBoundaryFilter?.(
+          current.target.canonicalKey,
+          current.entry,
+          sharingTargetFor(current.target, current.storePath, current.entry),
+        ) === false)
     ) {
       respond(true, { messages: [] }, undefined);
       return;
@@ -158,3 +179,18 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
     respond(true, { messages }, undefined);
   },
 };
+
+function sharingTargetFor(
+  target: { agentId: string; canonicalKey: string; storeKeys: string[] },
+  storePath: string,
+  entry: SessionEntry,
+): SessionSharingTarget {
+  return {
+    agentId: target.agentId,
+    canonicalKey: target.canonicalKey,
+    entry,
+    storeKey: target.storeKeys[0] ?? target.canonicalKey,
+    storeKeys: target.storeKeys,
+    storePath,
+  };
+}

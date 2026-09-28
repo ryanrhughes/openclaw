@@ -16,6 +16,7 @@ import {
 } from "../../local-user-ingress.js";
 import { hasGatewayOperatorAccessPolicies } from "../../operator-access-policy.js";
 import { WEBSOCKET_OPEN_READY_STATE } from "../../server-constants.js";
+import { loadSessionProfilePreferences } from "../../session-profile-preferences.js";
 import { formatForLog } from "../../ws-log.js";
 import type { GatewayWsClient } from "../ws-types.js";
 import {
@@ -99,6 +100,8 @@ async function resolveAuthenticatedProfile(
     throw new Error("Gateway profile changed during acquisition");
   }
   const { id, displayName, avatarRevision, hasAvatar } = authority.display;
+  await loadSessionProfilePreferences(id);
+  assertCurrent?.();
   return {
     profile: { profileId: id, displayName, avatarRevision, hasAvatar, updatedAt },
     authority,

@@ -21,9 +21,10 @@ import {
   SessionMutationAuthorizationChangedError,
 } from "./session-sharing.js";
 import {
-  sharingPolicyClient as client,
+  publishDatabaseMembershipSnapshotForTest,
   roleClient,
   rolePolicyConfig,
+  sharingPolicyClient as client,
 } from "./session-sharing.test-utils.js";
 
 afterEach(() => closeOpenClawAgentDatabasesForTest());
@@ -406,6 +407,7 @@ describe("session sharing policy", () => {
         updatedAt: 1,
         createdVia: "cron" as const,
         createdActor: { type: "human" as const, source: "profile" as const, id: creatorId },
+        visibility: "draft" as const,
       };
       await upsertSessionEntryCore({ agentId: "main", sessionKey: foreignKey }, foreignEntry);
       await upsertSessionEntryCore(
@@ -422,6 +424,7 @@ describe("session sharing policy", () => {
         { identityId: restrictedId, addedBy: creatorId, expectedSessionId: foreignEntry.sessionId },
       );
 
+      publishDatabaseMembershipSnapshotForTest();
       const entryFilter = createSessionListEntryFilter({ cfg, client: restricted });
       const creatorEntryFilter = createSessionListEntryFilter({ cfg, client: creator });
       expect(entryFilter?.(foreignKey, foreignEntry)).toBe(false);
@@ -508,7 +511,9 @@ describe("session sharing policy", () => {
         createSessionListEntryFilter({ cfg: {}, client: restricted })?.(foreignKey, foreignEntry),
       ).toBe(true);
       const admin = client({ user: restrictedId, scopes: ["operator.admin"] });
-      expect(createSessionListEntryFilter({ cfg, client: admin })).toBeUndefined();
+      expect(createSessionListEntryFilter({ cfg, client: admin })?.(foreignKey, foreignEntry)).toBe(
+        true,
+      );
       expect(
         resolveSessionMutationAuthorization({
           client: admin,
@@ -939,7 +944,7 @@ describe("session sharing policy", () => {
     });
   });
 
-  it("keeps draft typing events owner and admin only", async () => {
+  it("delivers draft events to the owner and explicit members", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const sessionKey = "agent:main:draft-typing";
       await upsertSessionEntryCore(
@@ -955,6 +960,13 @@ describe("session sharing policy", () => {
         { agentId: "main", sessionKey },
         { identityId: "member", addedBy: "owner", expectedSessionId: "session-draft" },
       );
+      const cappedMember = roleClient("view", "draft-capped-member");
+      const cappedMemberId = cappedMember.authenticatedUserProfile!.profileId;
+      addSessionMember(
+        { agentId: "main", sessionKey },
+        { identityId: cappedMemberId, addedBy: "owner", expectedSessionId: "session-draft" },
+      );
+      publishDatabaseMembershipSnapshotForTest();
       const check = (user: string, event: string) =>
         canReceiveSessionEvent({
           cfg: {},
@@ -964,13 +976,39 @@ describe("session sharing policy", () => {
         });
 
       expect(check("owner", "session.typing")).toBe(true);
-      expect(check("member", "session.typing")).toBe(false);
+      expect(check("member", "session.typing")).toBe(true);
       expect(check("viewer", "session.typing")).toBe(false);
-      expect(check("member", "session.message")).toBe(false);
+      expect(check("member", "session.message")).toBe(true);
+      const cappedCfg = rolePolicyConfig();
+      const cappedTarget = resolveSessionSharingTarget({ cfg: cappedCfg, sessionKey });
+      expect(cappedTarget).not.toBeNull();
+      expect(
+        cappedTarget &&
+          createSessionListEntryFilter({ cfg: cappedCfg, client: cappedMember })?.(
+            sessionKey,
+            cappedTarget.entry,
+          ),
+      ).toBe(true);
+      expect(
+        authorizeResolvedSessionMutation({
+          cfg: cappedCfg,
+          client: cappedMember,
+          sessionKey,
+          agentId: "main",
+        }),
+      ).toMatchObject({ details: { code: "SESSION_PARTICIPATION_REQUIRED" } });
       expect(
         canReceiveSessionEvent({
           cfg: {},
           client: client({ user: "admin", scopes: ["operator.admin"] }) as never,
+          sessionKeys: [sessionKey],
+          event: "session.typing",
+        }),
+      ).toBe(false);
+      expect(
+        canReceiveSessionEvent({
+          cfg: {},
+          client: client({ scopes: ["operator.admin"] }) as never,
           sessionKeys: [sessionKey],
           event: "session.typing",
         }),
