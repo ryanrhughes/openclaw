@@ -1,14 +1,19 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { expect, test } from "vitest";
 import { loadSessionEntry } from "../config/sessions/session-accessor.js";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { drainSystemEvents, peekSystemEvents } from "../infra/system-events.js";
 import { listSessionStateEventsSince } from "../sessions/session-state-events.js";
+import { setCanonicalUserPreferences } from "../state/user-preferences.js";
+import { ensureProfileForEmail } from "../state/user-profiles.js";
 import {
   attachGatewayLocalUserIngress,
   prepareGatewayLocalUserIngress,
 } from "./local-user-ingress.js";
+import { loadSessionProfilePreferences } from "./session-profile-preferences.js";
 import {
   directSessionReq,
+  getGatewayConfigModule,
   setupGatewaySessionsTestHarness,
 } from "./test/server-sessions.test-helpers.js";
 
@@ -132,4 +137,117 @@ test("sessions.create stamps trusted operator provenance and records created", a
     expect(stored).toMatchObject({ createdVia: "spawn", createdActor: actor });
     expect(stored?.sandbox).toBe(sandbox);
   }
+});
+
+test("sessions.create resolves private defaults, profile overrides, explicit visibility, Home, and inheritance", async () => {
+  const { storePath } = await createSessionStoreDir();
+  const base = (await getGatewayConfigModule()).getRuntimeConfig();
+  let cfg: OpenClawConfig = base;
+  const context = { getRuntimeConfig: () => cfg };
+  const clientFor = (profileId: string) => {
+    const client = {
+      connect: { scopes: ["operator.write"] },
+      authenticatedUserProfile: {
+        profileId,
+        displayName: "Session Creator",
+        hasAvatar: false,
+        updatedAt: 1,
+      },
+    };
+    attachGatewayLocalUserIngress(
+      client,
+      prepareGatewayLocalUserIngress({
+        authenticatedUserExpected: true,
+        profile: { profileId, displayName: "Session Creator" },
+        isLocalClient: false,
+      }),
+    );
+    return client as never;
+  };
+  const create = async (name: string, profileId: string, params: Record<string, unknown> = {}) => {
+    const key = `agent:main:dashboard:private-default-${name}`;
+    const result = await directSessionReq<{ key: string }>(
+      "sessions.create",
+      { key, ...params },
+      { client: clientFor(profileId), context },
+    );
+    expect(result.ok, `${name}: ${JSON.stringify(result.error)}`).toBe(true);
+    return loadSessionEntry({ sessionKey: result.payload?.key ?? key, storePath });
+  };
+
+  const stockProfile = ensureProfileForEmail("stock-default@example.test");
+  expect((await create("stock", stockProfile.id))?.visibility).toBeUndefined();
+
+  cfg = { ...base, session: { ...base.session, sharing: { defaultVisibility: "private" } } };
+  const privateProfile = ensureProfileForEmail("private-default@example.test");
+  expect((await create("gateway-private", privateProfile.id))?.visibility).toBe("draft");
+
+  const sharedOverride = ensureProfileForEmail("shared-override@example.test");
+  await setCanonicalUserPreferences(sharedOverride.id, {
+    "sessions.defaultVisibility": "shared",
+  });
+  await loadSessionProfilePreferences(sharedOverride.id);
+  expect((await create("shared-override", sharedOverride.id))?.visibility).toBeUndefined();
+
+  cfg = { ...base, session: { ...base.session, sharing: { defaultVisibility: "shared" } } };
+  const privateOverride = ensureProfileForEmail("private-override@example.test");
+  await setCanonicalUserPreferences(privateOverride.id, {
+    "sessions.defaultVisibility": "private",
+  });
+  await loadSessionProfilePreferences(privateOverride.id);
+  expect((await create("private-override", privateOverride.id))?.visibility).toBe("draft");
+
+  const invalidOverride = ensureProfileForEmail("invalid-override@example.test");
+  await setCanonicalUserPreferences(invalidOverride.id, {
+    "sessions.defaultVisibility": "unexpected",
+  });
+  await loadSessionProfilePreferences(invalidOverride.id);
+  expect((await create("invalid-override", invalidOverride.id))?.visibility).toBeUndefined();
+
+  cfg = {
+    ...base,
+    session: { ...base.session, sharing: { drafts: false, defaultVisibility: "shared" } },
+  };
+  expect((await create("drafts-disabled", privateOverride.id))?.visibility).toBeUndefined();
+
+  cfg = { ...base, session: { ...base.session, sharing: { defaultVisibility: "private" } } };
+  expect(
+    (await create("explicit-shared", privateOverride.id, { visibility: "shared" }))?.visibility,
+  ).toBe("shared");
+
+  const home = await directSessionReq<{ key: string }>(
+    "sessions.create",
+    { key: "agent:main:main", visibility: "draft" },
+    { client: clientFor(privateOverride.id), context },
+  );
+  expect(home.ok, JSON.stringify(home.error)).toBe(true);
+  expect(loadSessionEntry({ sessionKey: "agent:main:main", storePath })?.visibility).not.toBe(
+    "draft",
+  );
+
+  const syntheticKey = "agent:main:dashboard:private-default-synthetic";
+  const synthetic = await directSessionReq<{ key: string }>(
+    "sessions.create",
+    { key: syntheticKey },
+    {
+      client: {
+        connect: { scopes: ["operator.write"] },
+        internal: { syntheticClient: true },
+      } as never,
+      context,
+    },
+  );
+  expect(synthetic.ok, JSON.stringify(synthetic.error)).toBe(true);
+  expect(loadSessionEntry({ sessionKey: syntheticKey, storePath })?.visibility).toBeUndefined();
+
+  const parent = await create("draft-parent", privateOverride.id, { visibility: "draft" });
+  const parentKey = "agent:main:dashboard:private-default-draft-parent";
+  expect(parent?.visibility).toBe("draft");
+  const child = await create("draft-child", privateOverride.id, { parentSessionKey: parentKey });
+  expect(child?.visibility).toBe("draft");
+  const fork = await create("draft-fork", privateOverride.id, {
+    parentSessionKey: parentKey,
+    fork: true,
+  });
+  expect(fork?.visibility).toBe("draft");
 });

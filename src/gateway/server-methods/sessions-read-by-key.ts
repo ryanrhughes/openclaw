@@ -7,6 +7,7 @@ import { getSessionRowProjection } from "../session-row-projection-access.js";
 import {
   authorizeIncognitoSessionTarget,
   createSessionListEntryFilter,
+  isGatewayAdmin,
 } from "../session-sharing.js";
 import { readRecentSessionMessagesWithStatsAsync } from "../session-transcript-readers.js";
 import { loadSessionEntriesForTarget, requireSessionKey } from "./sessions-shared.js";
@@ -57,8 +58,13 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
           const record = read.describe(query);
           if (
             !record ||
-            (presentation.sharing.sessionCap !== undefined &&
-              presentation.sharing.entryFilter?.(record.key, record.entry) === false)
+            (!isGatewayAdmin(client ?? null) &&
+              presentation.sharing.sessionCap !== undefined &&
+              presentation.sharing.entryFilter?.(
+                record.key,
+                record.entry,
+                presentation.target(query) ?? undefined,
+              ) === false)
           ) {
             respond(true, { session: null });
             return;
@@ -107,7 +113,9 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       agentId: requestedAgent.agentId,
     });
     const boundaryFilter = hasOperatorBoundary(client, cfg)
-      ? createSessionListEntryFilter({ client, cfg })
+      ? createSessionListEntryFilter({ client, cfg }, undefined, undefined, {
+          adminDirectAccess: true,
+        })
       : undefined;
     if (!entry?.sessionId || boundaryFilter?.(target.canonicalKey, entry) === false) {
       respond(true, { messages: [] }, undefined);
@@ -142,7 +150,9 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
         })
       : null;
     const currentBoundaryFilter = hasOperatorBoundary(client, currentCfg)
-      ? createSessionListEntryFilter({ client, cfg: currentCfg })
+      ? createSessionListEntryFilter({ client, cfg: currentCfg }, undefined, undefined, {
+          adminDirectAccess: true,
+        })
       : undefined;
     if (
       !current ||

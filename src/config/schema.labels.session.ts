@@ -36,6 +36,7 @@ export const SESSION_FIELD_LABELS: Record<string, string> = {
   "session.sharing.readOnly": "Allow Read-only Sessions",
   "session.sharing.suggest": "Allow Suggest Sessions",
   "session.sharing.drafts": "Allow Draft Sessions",
+  "session.sharing.defaultVisibility": "Default Session Visibility",
   "session.maintenance": "Session Maintenance",
   "session.maintenance.coldStorage": "Transcript Cold Storage",
   "session.maintenance.coldStorage.enabled": "Automatically Archive Old Transcripts",

@@ -31,7 +31,6 @@ import { getSessionRowProjection } from "../session-row-projection-access.js";
 import {
   authorizeResolvedSessionMutation,
   resolveSessionMutationAuthorization,
-  SessionMutationAuthorizationChangedError,
   canReceiveSessionEvent,
   createSessionListEntryFilter,
   invalidateSessionSharingSnapshot,
@@ -568,8 +567,7 @@ describe("session sharing handlers", () => {
             visibility: "shared",
           },
         );
-        // A member of the (soon-draft) session must also lose it: drafts are
-        // owner+admin only.
+        // A member of the soon-private session retains access.
         expect(
           addSessionMember(
             { agentId: "main", sessionKey },
@@ -622,12 +620,12 @@ describe("session sharing handlers", () => {
           hasMore: false,
           owners: [],
         });
-        // A member also loses a draft (owner+admin only).
+        // Explicit membership activates the private session.
         expect(
           (await listWith(identifiedClient("member@example.com")))?.sessions.some(
             (session) => session.key === sessionKey,
           ),
-        ).toBe(false);
+        ).toBe(true);
         // The owner still sees their own draft.
         expect(
           (await listWith(identifiedClient("owner@example.com")))?.sessions.some(
@@ -692,7 +690,7 @@ describe("session sharing handlers", () => {
     });
   });
 
-  it("revokes all member access while a session is draft and restores it when shared", async () => {
+  it("keeps capped member access active while a session is draft", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const sessionKey = "agent:main:member-transition";
       const owner = { id: "owner@example.com", label: "Owner" };
@@ -756,7 +754,10 @@ describe("session sharing handlers", () => {
         if (!entry) {
           throw new Error("expected member transition session entry");
         }
-        const listed = createSessionListEntryFilter({ client: memberClient })?.(sessionKey, entry);
+        const listed = createSessionListEntryFilter({ client: memberClient, cfg: {} })?.(
+          sessionKey,
+          entry,
+        );
         expect(listed ?? true).toBe(allowed);
         expect(
           canReceiveSessionEvent({
@@ -778,10 +779,8 @@ describe("session sharing handlers", () => {
       expect(captured.error).toBeNull();
       await patchSessionEntryCore({ agentId: "main", sessionKey }, () => ({ visibility: "draft" }));
       invalidateSessionSharingSnapshot(sessionKey);
-      expectAccess(false);
-      expect(() => captured.authorization?.assertCurrent()).toThrow(
-        SessionMutationAuthorizationChangedError,
-      );
+      expectAccess(true);
+      expect(() => captured.authorization?.assertCurrent()).not.toThrow();
       await patchSessionEntryCore({ agentId: "main", sessionKey }, () => ({
         visibility: "shared",
       }));

@@ -22,10 +22,15 @@ export function retainSessionScopedRead(
   const operatorProfileId = actor?.kind === "operator" ? actor.profileId : undefined;
   const narrow = authority.sessionScope === "operator.sessions.read";
   // Canonical solo owner, admin and system exemptions keep their existing workspace access.
-  const initialVisibility = createSessionListEntryFilter({
-    client: options.client,
-    cfg: options.context.getRuntimeConfig(),
-  });
+  const initialVisibility = createSessionListEntryFilter(
+    {
+      client: options.client,
+      cfg: options.context.getRuntimeConfig(),
+    },
+    undefined,
+    undefined,
+    { adminDirectAccess: true },
+  );
   if (!narrow && !initialVisibility) {
     return undefined;
   }
@@ -33,10 +38,15 @@ export function retainSessionScopedRead(
   const assertCurrent = () => {
     authority.assertCurrent();
     const currentActor = resolveGatewayOperatorRoleActor(options.client);
-    const visible = createSessionListEntryFilter({
-      client: options.client,
-      cfg: options.context.getRuntimeConfig(),
-    });
+    const visible = createSessionListEntryFilter(
+      {
+        client: options.client,
+        cfg: options.context.getRuntimeConfig(),
+      },
+      undefined,
+      undefined,
+      { adminDirectAccess: true },
+    );
     if (
       (narrow &&
         (!operatorProfileId ||

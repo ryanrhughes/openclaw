@@ -349,6 +349,7 @@ export async function admitChatSend(params: {
         cfg: latestSession.cfg,
         client,
         agentId,
+        sessionKey,
         getRuntimeConfig: context.getRuntimeConfig,
       });
       initialSessionEntry = prepared.entry;

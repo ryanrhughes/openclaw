@@ -105,6 +105,7 @@ import {
   rollbackGatewaySessionPreparation,
 } from "./session-lifecycle-preparation.js";
 import { resolvePluginSessionOwnershipError } from "./session-plugin-ownership.js";
+import { resolveNewSessionVisibility } from "./session-profile-preferences.js";
 import { resolveRequestedSessionAgentId } from "./session-request-agent.js";
 import { isSessionVisibilityAllowed, resolveSessionVisibility } from "./session-sharing.js";
 import {
@@ -743,6 +744,13 @@ export async function createGatewaySession(
       parent: currentParentSessionEntry,
     });
     const target = creationTarget;
+    const effectiveVisibility = resolveNewSessionVisibility({
+      cfg: params.cfg,
+      creator: creation?.actor,
+      explicit: params.visibility,
+      inheritsDraft: resolveSessionVisibility(currentParentSessionEntry ?? {}) === "draft",
+      isMainSession: target.canonicalKey === agentMainSessionKey,
+    });
     const currentTargetEntry = loadGatewaySessionEntryReadOnly(target.canonicalKey, {
       agentId: target.agentId,
     }).entry;
@@ -1123,7 +1131,7 @@ export async function createGatewaySession(
               })
             : {}),
           ...(createdNewEntry && inheritedSpawnOwner ? { owner: inheritedSpawnOwner } : {}),
-          ...(params.visibility && createdNewEntry ? { visibility: params.visibility } : {}),
+          ...(effectiveVisibility && createdNewEntry ? { visibility: effectiveVisibility } : {}),
           ...projectPreparedSessionWorkspace(existingEntry, {
             projectId,
             pendingProjectGitUrl,
