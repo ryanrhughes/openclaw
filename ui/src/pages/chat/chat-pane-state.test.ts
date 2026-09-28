@@ -287,7 +287,7 @@ describe("SessionParticipationTracker", () => {
   it("blocks only on a positively observed restricted state", () => {
     expect(
       resolve(new SessionParticipationTracker(), {
-        session: { visibility: "draft", sharingRole: "member" },
+        session: { visibility: "draft", sharingRole: "viewer" },
       }),
     ).toBe(true);
     expect(
@@ -300,13 +300,19 @@ describe("SessionParticipationTracker", () => {
         session: { visibility: "shared", sharingRole: "member" },
       }),
     ).toBe(false);
+    // Invited members act in private sessions alongside the owner and admins.
+    expect(
+      resolve(new SessionParticipationTracker(), {
+        session: { visibility: "draft", sharingRole: "member" },
+      }),
+    ).toBe(false);
   });
 
   it("never blocks a session that is absent from a completed list (filter/pagination/deletion)", () => {
     const tracker = new SessionParticipationTracker();
     // Even a previously restricted session that drops out of a filtered or
     // paginated list must not stay blocked once the load completes.
-    expect(resolve(tracker, { session: { visibility: "draft", sharingRole: "member" } })).toBe(
+    expect(resolve(tracker, { session: { visibility: "draft", sharingRole: "viewer" } })).toBe(
       true,
     );
     expect(resolve(tracker)).toBe(false);
@@ -314,7 +320,7 @@ describe("SessionParticipationTracker", () => {
 
   it("holds the last known block across an in-flight refresh to avoid flicker", () => {
     const tracker = new SessionParticipationTracker();
-    expect(resolve(tracker, { session: { visibility: "draft", sharingRole: "member" } })).toBe(
+    expect(resolve(tracker, { session: { visibility: "draft", sharingRole: "viewer" } })).toBe(
       true,
     );
     expect(resolve(tracker, { listLoading: true })).toBe(true);
@@ -327,7 +333,7 @@ describe("SessionParticipationTracker", () => {
 
   it("forgets held state when the gateway connection changes", () => {
     const tracker = new SessionParticipationTracker();
-    expect(resolve(tracker, { session: { visibility: "draft", sharingRole: "member" } })).toBe(
+    expect(resolve(tracker, { session: { visibility: "draft", sharingRole: "viewer" } })).toBe(
       true,
     );
     expect(resolve(tracker, { listLoading: true })).toBe(true);
@@ -340,7 +346,7 @@ describe("SessionParticipationTracker", () => {
     expect(
       resolve(tracker, {
         sessionKey: "main\0global",
-        session: { visibility: "draft", sharingRole: "member" },
+        session: { visibility: "draft", sharingRole: "viewer" },
       }),
     ).toBe(true);
     expect(resolve(tracker, { sessionKey: "work\0global", listLoading: true })).toBe(false);
