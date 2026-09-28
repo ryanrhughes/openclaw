@@ -414,10 +414,6 @@ export async function spawnAcpDirect(
   const parentAgentId = parentSessionKey
     ? resolveAgentIdFromSessionKey(parentSessionKey, requesterAgentId)
     : undefined;
-  const parentEntry = loadSessionEntryReadOnly({
-    sessionKey: requesterInternalKey,
-    agentId: parentAgentId ?? requesterAgentId,
-  });
   // Resolve parent session delivery context so system events route to the
   // correct thread/topic instead of falling back to the main DM.
   const parentDeliveryCtx =
@@ -477,9 +473,6 @@ export async function spawnAcpDirect(
             // Navigation parent is stamped at creation so the durable tree edge
             // does not depend on the control-lineage field.
             parentSessionKey: requesterInternalKey,
-            ...(cfg.session?.sharing?.drafts !== false && parentEntry?.visibility === "draft"
-              ? { visibility: "draft" as const }
-              : {}),
             ...childSessionPatch,
             inheritedToolPolicyVersion: 1,
             ...inheritedToolAllowPatch(ctx.inheritedToolAllowlist),

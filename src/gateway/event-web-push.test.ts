@@ -603,6 +603,8 @@ describe("event Web Push classification", () => {
           const recipient = ensureProfileForEmail("draft-admin@example.test");
           setUserProfileRole(recipient.id, "admin");
           if (scenario === "eligible admin") {
+            // Durable preference reads need the host broker, which this worker project lacks;
+            // publish the opt-in the way users.prefs.set does.
             applySessionProfilePreferenceChanges(recipient.id, {
               "sessions.showOthersPrivate": true,
             });

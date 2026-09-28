@@ -26,6 +26,7 @@ import { resolveControlUiWebPushUrl } from "./control-ui-shared.js";
 import { QUESTIONS_SCOPE } from "./method-scopes.js";
 import { ADMIN_SCOPE, READ_SCOPE } from "./operator-scopes.js";
 import type { GatewayBroadcastOpts } from "./server-broadcast-types.js";
+import { loadSessionProfilePreferences } from "./session-profile-preferences.js";
 import { canReceiveSessionEvent } from "./session-sharing.js";
 import {
   listCurrentWebPushTargets,
@@ -169,6 +170,13 @@ export function createEventWebPushDelivery(params: {
         return;
       }
       const sender = await prepareWebPushNotificationSender(params.stateDir);
+      // Offline recipients never connected since restart; load their durable session
+      // preferences so private-session eligibility matches their saved opt-in.
+      const mentionRecipientId = mention && resolveUserProfileId(mention.recipientProfileId);
+      if (mentionRecipientId) {
+        // Best effort: a failed read keeps the cached eligibility rather than dropping delivery.
+        await loadSessionProfilePreferences(mentionRecipientId).catch(() => undefined);
+      }
       const groupedResults = await withCurrentWebPushAuthority(
         params.stateDir,
         (subscriptions, pairedDevices) => {

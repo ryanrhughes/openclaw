@@ -151,6 +151,8 @@ export async function createInitialSubagentSession(params: {
     });
     // Spawn owns a fresh child lifecycle. Cleanup freezes both fields before
     // launch so it cannot delete a reset successor that reuses the session id.
+    const inheritsPrivate =
+      params.cfg.session?.sharing?.drafts !== false && parentEntry?.visibility === "draft";
     const childSessionIdentity = {
       sessionId: randomUUID(),
       lifecycleRevision: randomUUID(),
@@ -184,9 +186,7 @@ export async function createInitialSubagentSession(params: {
             }
           : {}),
         ...childSessionIdentity,
-        ...(params.cfg.session?.sharing?.drafts !== false && parentEntry?.visibility === "draft"
-          ? { visibility: "draft" as const }
-          : {}),
+        ...(inheritsPrivate ? { visibility: "draft" as const } : {}),
         ...(parentEntry?.skillLibrarySelections
           ? {
               skillLibrarySelections: parentEntry.skillLibrarySelections.map((selection) => ({
@@ -197,6 +197,11 @@ export async function createInitialSubagentSession(params: {
         ...buildSessionCreationStamp({
           via: "spawn",
           ...params.creationPolicy,
+          // Private is an isolation policy: like a required sandbox, the child keeps the
+          // parent's human creator so the person who spawned it retains access.
+          ...(inheritsPrivate && parentEntry?.createdActor?.type === "human"
+            ? { actor: parentEntry.createdActor }
+            : {}),
         }),
       },
       {
