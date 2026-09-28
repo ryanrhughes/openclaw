@@ -107,12 +107,12 @@ export function canReceiveSessionEvent(params: {
     if (snapshot.visibility !== "draft" || isCreator) {
       return true;
     }
-    const privateTarget = resolveTarget(sessionKey);
-    if (!privateTarget) {
-      return false;
-    }
-    // Membership comes from the published snapshot; a none cap was rejected above for non-admins.
-    return sharing.isMember(privateTarget, identity.id);
+    // Membership comes from prepared projection rows or the published snapshot, never a
+    // store lookup; a none cap was rejected above for non-admins.
+    const privateTarget = params.prepared ? resolveTarget(sessionKey) : null;
+    return privateTarget
+      ? sharing.isMember(privateTarget, identity.id)
+      : readSessionMembershipSnapshot({ sessionKey })?.includes(identity.id) === true;
   });
   if (!visible || event !== "session.suggestion") {
     return visible;
@@ -268,17 +268,37 @@ export function createSessionListEntryFilter(
 }
 
 export function createProfileSessionEntryFilter(
-  params: { profileId: string; sessionCap?: ReturnType<typeof operatorSessionCap> },
+  params: {
+    profileId: string;
+    sessionCap?: ReturnType<typeof operatorSessionCap>;
+    /** Admins keep every non-private session; others' private ones need membership or opt-in. */
+    admin?: boolean;
+  },
   isCreator?: ReturnType<typeof prepareSessionCreatorProfile>,
 ) {
   // Unprepared filters (notably preview) may survive yields and must read current aliases.
   const creatorMatches = isCreator ?? ((actor) => isSessionCreatorProfile(actor, params.profileId));
+  const memberMatches = (sessionKey: string | undefined) =>
+    sessionKey !== undefined &&
+    readSessionMembershipSnapshot({ sessionKey })?.includes(params.profileId) === true;
   return (
     sessionKey: string | undefined,
     entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito">,
-  ) =>
-    entry.incognito !== true &&
-    !isIncognitoSessionKey(sessionKey) &&
-    (creatorMatches(entry.createdActor) ||
-      (params.sessionCap !== "none" && resolveSessionVisibility(entry) !== "draft"));
+  ) => {
+    const privateSession = resolveSessionVisibility(entry) === "draft";
+    if (params.admin) {
+      return (
+        !privateSession ||
+        creatorMatches(entry.createdActor) ||
+        profileShowsOthersPrivate(params.profileId) ||
+        memberMatches(sessionKey)
+      );
+    }
+    return (
+      entry.incognito !== true &&
+      !isIncognitoSessionKey(sessionKey) &&
+      (creatorMatches(entry.createdActor) ||
+        (params.sessionCap !== "none" && (!privateSession || memberMatches(sessionKey))))
+    );
+  };
 }

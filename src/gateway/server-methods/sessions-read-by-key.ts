@@ -1,6 +1,7 @@
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { validateSessionsDescribeParams } from "../../../packages/gateway-protocol/src/index.js";
 import type { SessionEntry } from "../../config/sessions.js";
+import { hasOperatorBoundary } from "../operator-role-policy.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
 import { prepareProjectedSessionPresentation } from "../session-row-presentation.js";
 import { getSessionRowProjection } from "../session-row-projection-access.js";
@@ -60,6 +61,7 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
           if (
             !record ||
             (!isGatewayAdmin(client ?? null) &&
+              presentation.sharing.sessionCap !== undefined &&
               presentation.sharing.entryFilter?.(
                 record.key,
                 record.entry,
@@ -112,10 +114,11 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       cfg,
       agentId: requestedAgent.agentId,
     });
-    // Private sessions stay hidden from uninvited profiles even without gateway.roles.
-    const boundaryFilter = createSessionListEntryFilter({ client, cfg }, undefined, undefined, {
-      adminDirectAccess: true,
-    });
+    const boundaryFilter = hasOperatorBoundary(client, cfg)
+      ? createSessionListEntryFilter({ client, cfg }, undefined, undefined, {
+          adminDirectAccess: true,
+        })
+      : undefined;
     if (
       !entry?.sessionId ||
       boundaryFilter?.(target.canonicalKey, entry, sharingTargetFor(target, storePath, entry)) ===
@@ -152,12 +155,11 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
           agentId: currentRequestedAgent.agentId,
         })
       : null;
-    const currentBoundaryFilter = createSessionListEntryFilter(
-      { client, cfg: currentCfg },
-      undefined,
-      undefined,
-      { adminDirectAccess: true },
-    );
+    const currentBoundaryFilter = hasOperatorBoundary(client, currentCfg)
+      ? createSessionListEntryFilter({ client, cfg: currentCfg }, undefined, undefined, {
+          adminDirectAccess: true,
+        })
+      : undefined;
     if (
       !current ||
       current.target.agentId !== target.agentId ||
