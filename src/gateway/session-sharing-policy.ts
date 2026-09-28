@@ -442,10 +442,11 @@ export function authorizeSessionSharingTarget(
     return hiddenSessionNotFound(params.target.canonicalKey);
   }
   const capped = sessionCap === "view" || sessionCap === "suggest";
-  // Draft membership is inactive, while an explicit role caps even shared visibility.
+  // Explicit membership activates private sessions only within the operator role cap.
   const canMutate =
     visibility === "draft"
-      ? canManageSessionSharing(role)
+      ? canManageSessionSharing(role) ||
+        (role === "member" && (sessionCap === undefined || sessionCap === "write"))
       : role !== "viewer" || (visibility === "shared" && !capped);
   return canMutate
     ? null

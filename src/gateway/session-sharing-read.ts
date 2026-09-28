@@ -1,4 +1,4 @@
-import type { SessionEntry } from "../config/sessions.js";
+import { isSessionMember, type SessionEntry } from "../config/sessions.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isIncognitoSessionKey } from "../routing/session-key.js";
 import { operatorScopeSatisfied } from "../shared/operator-scope-compat.js";
@@ -11,9 +11,9 @@ import {
 } from "./operator-role-policy.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { isSessionCreatorProfile, prepareSessionCreatorProfile } from "./session-creator.js";
+import { profileShowsOthersPrivate } from "./session-profile-preferences.js";
 import {
   authorizeSessionSharingTarget,
-  canManageSessionSharing,
   isGatewayAdmin,
   resolveSessionSharingRole,
   resolveSessionSharingTarget,
@@ -69,10 +69,11 @@ export function canReceiveSessionEvent(params: {
   ) {
     return false;
   }
-  if (isGatewayAdmin(client)) {
+  const admin = isGatewayAdmin(client);
+  const identity = sharingIdentity(client, operatorActor);
+  if (admin && (!identity || profileShowsOthersPrivate(identity.id))) {
     return true;
   }
-  const identity = sharingIdentity(client, operatorActor);
   if (!identity) {
     return (
       (!operatorScopeSatisfied("operator.sessions.read", client.connect.scopes ?? []) ||
@@ -111,17 +112,20 @@ export function canReceiveSessionEvent(params: {
         }
       : loadSharingSnapshot({ cfg, ...lookup, sessionKey });
     const isCreator = sharing.isCreator(snapshot.createdActor);
-    if (snapshot.incognito || (hidesForeignSessions && !isCreator)) {
+    if ((snapshot.incognito && !admin) || (hidesForeignSessions && !isCreator)) {
       return false;
     }
     if (snapshot.visibility !== "draft" || isCreator) {
       return true;
     }
-    if (event !== "session.typing") {
+    const privateTarget = resolveTarget(sessionKey);
+    if (!privateTarget) {
       return false;
     }
-    const typingTarget = resolveTarget(sessionKey);
-    return typingTarget !== null && canManageSessionSharing(sharing.roleForTarget(typingTarget));
+    if (admin) {
+      return Boolean(identity && sharing.isMember(privateTarget, identity.id));
+    }
+    return sharing.roleForTarget(privateTarget) !== "viewer";
   });
   if (!visible || event !== "session.suggestion") {
     return visible;
@@ -146,6 +150,7 @@ export function prepareSessionSharing(
     aliases: ReadonlySet<string>;
     sessionCap: ReturnType<typeof operatorSessionCap>;
     isMember: (target: SessionSharingTarget, identityId: string) => boolean;
+    target?: (sessionKey: string) => SessionSharingTarget | null;
   },
 ) {
   const identity = sharingIdentity(params.client, resolveGatewayOperatorRoleActor(params.client));
@@ -163,6 +168,16 @@ export function prepareSessionSharing(
     );
   return {
     isCreator,
+    isMember: (target: SessionSharingTarget, identityId: string) =>
+      prepared?.isMember(target, identityId) ??
+      isSessionMember(
+        {
+          agentId: target.agentId,
+          sessionKey: target.storeKey,
+          storePath: target.storePath,
+        },
+        identityId,
+      ),
     sessionCap: prepared?.sessionCap,
     entryFilter: createSessionListEntryFilter(params, isCreator, prepared),
     roleForTarget,
@@ -178,8 +193,9 @@ export function prepareProjectedSessionSharing(params: {
   cfg: OpenClawConfig;
   client: GatewayClient | null;
   isMember: (target: SessionSharingTarget, identityId: string) => boolean;
+  target: (sessionKey: string) => SessionSharingTarget | null;
 }) {
-  const { cfg, client, isMember } = params;
+  const { cfg, client, isMember, target } = params;
   if (client?.internal?.syntheticClient) {
     prepareGatewayRecipientProfile(client);
   }
@@ -201,22 +217,34 @@ export function prepareProjectedSessionSharing(params: {
     aliases: profile?.aliases ?? new Set(),
     sessionCap,
     isMember,
+    target,
   });
 }
 
 export function createSessionListEntryFilter(
   params: Pick<SessionSharingRoleParams, "cfg" | "client">,
   isCreator?: ReturnType<typeof prepareSessionCreatorProfile>,
-  prepared?: { sessionCap: ReturnType<typeof operatorSessionCap> },
+  prepared?: {
+    sessionCap: ReturnType<typeof operatorSessionCap>;
+    isMember?: (target: SessionSharingTarget, identityId: string) => boolean;
+    target?: (sessionKey: string) => SessionSharingTarget | null;
+  },
+  options?: { adminDirectAccess?: boolean },
 ):
   | ((
       sessionKey: string | undefined,
       entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito">,
+      target?: SessionSharingTarget,
     ) => boolean)
   | undefined {
   const operatorActor = resolveGatewayOperatorRoleActor(params.client);
   const identity = sharingIdentity(params.client, operatorActor);
-  if (isGatewayAdmin(params.client) || (!identity && operatorActor?.kind === "system")) {
+  const admin = isGatewayAdmin(params.client);
+  if (
+    (admin &&
+      (options?.adminDirectAccess || !identity || profileShowsOthersPrivate(identity.id))) ||
+    (!identity && operatorActor?.kind === "system")
+  ) {
     return undefined;
   }
   if (!identity) {
@@ -225,7 +253,41 @@ export function createSessionListEntryFilter(
   const sessionCap = prepared
     ? prepared.sessionCap
     : params.cfg && operatorSessionCap(params.client, params.cfg);
-  return createProfileSessionEntryFilter({ profileId: identity.id, sessionCap }, isCreator);
+  const creatorMatches = isCreator ?? ((actor) => isSessionCreatorProfile(actor, identity.id));
+  const memberMatches = (sessionKey: string | undefined, target?: SessionSharingTarget) => {
+    if (!sessionKey) {
+      return false;
+    }
+    const resolved =
+      target ??
+      prepared?.target?.(sessionKey) ??
+      (params.cfg ? resolveSessionSharingTarget({ cfg: params.cfg, sessionKey }) : null);
+    if (!resolved) {
+      return false;
+    }
+    return prepared?.isMember
+      ? prepared.isMember(resolved, identity.id)
+      : isSessionMember(
+          {
+            agentId: resolved.agentId,
+            sessionKey: resolved.storeKey,
+            storePath: resolved.storePath,
+          },
+          identity.id,
+        );
+  };
+  return (sessionKey, entry, target) => {
+    if (!admin && (entry.incognito === true || isIncognitoSessionKey(sessionKey))) {
+      return false;
+    }
+    if (resolveSessionVisibility(entry) !== "draft") {
+      return admin || sessionCap !== "none" || creatorMatches(entry.createdActor);
+    }
+    return (
+      creatorMatches(entry.createdActor) ||
+      ((admin || sessionCap !== "none") && memberMatches(sessionKey, target))
+    );
+  };
 }
 
 export function createProfileSessionEntryFilter(

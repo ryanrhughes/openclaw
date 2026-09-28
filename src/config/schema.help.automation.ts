@@ -74,6 +74,8 @@ export const AUTOMATION_FIELD_HELP: Record<string, string> = {
     "Allows suggest visibility. In this phase it enforces the same admission policy as read-only; suggestion queues are configured by a later feature. Default: true.",
   "session.sharing.drafts":
     "Allows draft visibility, which hides sessions from non-owner, non-admin operators. Default: true.",
+  "session.sharing.defaultVisibility":
+    'Default for new sessions created by verified Gateway profiles: "shared" (default) or "private", which stores the session as draft. Private requires drafts to remain enabled.',
   "session.maintenance":
     "Automatic session-store maintenance controls for dashboard archiving, pruning age, entry caps, reset archive retention, and disk budget cleanup. Start in warn mode to observe impact, then enforce once thresholds are tuned.",
   "session.maintenance.mode":

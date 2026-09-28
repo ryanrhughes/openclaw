@@ -296,6 +296,7 @@ exports[`config tier coverage > keeps the curated common leaf set reviewable 1`]
   "session.sendPolicy.rules.*.match.chatType",
   "session.sendPolicy.rules.*.match.keyPrefix",
   "session.sendPolicy.rules.*.match.rawKeyPrefix",
+  "session.sharing.defaultVisibility",
   "session.sharing.drafts",
   "session.sharing.readOnly",
   "session.sharing.suggest",

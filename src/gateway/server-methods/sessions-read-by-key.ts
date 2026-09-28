@@ -10,6 +10,7 @@ import { getSessionRowProjection } from "../session-row-projection-access.js";
 import {
   authorizeIncognitoSessionTarget,
   createSessionListEntryFilter,
+  isGatewayAdmin,
 } from "../session-sharing.js";
 import { readRecentSessionMessagesWithStatsAsync } from "../session-transcript-readers.js";
 import { createVisibleActiveSessionRunProjector } from "./session-active-runs.js";
@@ -70,7 +71,12 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
         if (
           !record ||
           (hasOperatorBoundary(client, read.state.policyConfig) &&
-            presentation.sharing.entryFilter?.(record.key, record.entry) === false)
+            !isGatewayAdmin(client ?? null) &&
+            presentation.sharing.entryFilter?.(
+              record.key,
+              record.entry,
+              presentation.target(query) ?? undefined,
+            ) === false)
         ) {
           respond(true, { session: null });
           return;
@@ -161,7 +167,9 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
         : undefined;
       const policyConfig = read.state.policyConfig;
       const boundaryFilter = hasOperatorBoundary(client, policyConfig)
-        ? createSessionListEntryFilter({ client, cfg: policyConfig })
+        ? createSessionListEntryFilter({ client, cfg: policyConfig }, undefined, undefined, {
+            adminDirectAccess: true,
+          })
         : undefined;
       if (
         !current ||

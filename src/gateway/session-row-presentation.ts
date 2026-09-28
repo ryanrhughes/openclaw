@@ -27,7 +27,7 @@ type PresentationOptions = Omit<
   includeActivitySummary?: boolean;
 };
 
-function toProjectedSessionSharingTarget(record: records.MaterializedRow): SessionSharingTarget {
+function toProjectedSessionSharingTarget(record: records.EntryRow): SessionSharingTarget {
   return {
     agentId: record.agentId,
     canonicalKey: record.key,
@@ -97,6 +97,10 @@ export function prepareProjectedSessionPresentation(
   const sharing = prepareProjectedSessionSharing({
     cfg: policyConfig,
     client: client ?? null,
+    target: (sessionKey) => {
+      const agentId = tryResolveSessionCompatibilityOwnerAgentId(cfg, sessionKey);
+      return agentId ? target({ agentId, key: sessionKey }) : null;
+    },
     isMember: (value, identityId) =>
       projection
         .readMembership({
@@ -137,7 +141,15 @@ export function prepareProjectedSessionPresentation(
       options.excludedChildKeys ??
       new Set(
         record.materialized.source.childLinks?.flatMap(({ key, entry }) =>
-          client !== undefined && sharing.entryFilter?.(key, entry) === false ? [key] : [],
+          client !== undefined &&
+          sharing.entryFilter?.(
+            key,
+            entry,
+            target({ agentId: record.agentId, key, storePath: record.storeTarget.storePath }) ??
+              undefined,
+          ) === false
+            ? [key]
+            : [],
         ),
       );
     const sourceSwarm = record.materialized.row.swarm;
@@ -153,7 +165,14 @@ export function prepareProjectedSessionPresentation(
               (client === undefined ||
                 !projection
                   .selectEntries({ key: sessionKey })
-                  .some((child) => sharing.entryFilter?.(child.key, child.entry) === false)),
+                  .some(
+                    (child) =>
+                      sharing.entryFilter?.(
+                        child.key,
+                        child.entry,
+                        toProjectedSessionSharingTarget(child),
+                      ) === false,
+                  )),
           ),
         });
       }

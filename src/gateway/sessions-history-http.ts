@@ -206,8 +206,17 @@ export async function handleSessionHistoryHttpRequest(
   const historyClient = resolveSessionHistoryHttpClient(requestAuth, operatorScopes);
   if (
     !entry?.sessionId ||
-    createSessionListEntryFilter({ cfg, client: historyClient })?.(target.canonicalKey, entry) ===
-      false
+    createSessionListEntryFilter({ cfg, client: historyClient }, undefined, undefined, {
+      adminDirectAccess: true,
+    })?.(target.canonicalKey, entry, {
+      agentId: target.agentId,
+      canonicalKey: target.canonicalKey,
+      entry,
+      // The canonical entry above resolved from storeKeys[0]; other keys throw.
+      storeKey: target.storeKeys[0] ?? target.canonicalKey,
+      storeKeys: target.storeKeys,
+      storePath: target.storePath,
+    }) === false
   ) {
     sendSessionNotFound();
     return true;
@@ -278,10 +287,12 @@ export async function handleSessionHistoryHttpRequest(
       currentTarget.entry.lifecycleRevision !== entry.lifecycleRevision ||
       (entry.sessionStartedAt !== undefined &&
         currentTarget.entry.sessionStartedAt !== entry.sessionStartedAt) ||
-      createSessionListEntryFilter({ cfg: currentConfig, client: currentClient })?.(
-        currentTarget.canonicalKey,
-        currentTarget.entry,
-      ) === false
+      createSessionListEntryFilter(
+        { cfg: currentConfig, client: currentClient },
+        undefined,
+        undefined,
+        { adminDirectAccess: true },
+      )?.(currentTarget.canonicalKey, currentTarget.entry, currentTarget) === false
     ) {
       return false;
     }

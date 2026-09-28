@@ -32,6 +32,7 @@ import {
 import { GatewayClientRegistry } from "../server/client-registry.js";
 import { createGatewayWsTestSocket } from "../server/ws-connection.test-helpers.js";
 import { createOperatorWsClient } from "../server/ws-connection/authenticated-request-dispatch.test-support.js";
+import { profileShowsOthersPrivate } from "../session-profile-preferences.js";
 import type { GatewayClient, GatewayRequestHandler } from "./types.js";
 import { usersHandlers } from "./users.js";
 
@@ -438,6 +439,58 @@ test("users.prefs returns a typed result without a durable identity", async () =
   });
   expect(context.getClientConnIds).not.toHaveBeenCalled();
   expect(context.broadcastToConnIds).not.toHaveBeenCalled();
+});
+
+test("users.prefs exposes the gateway session default only on request and rejects gateway writes", async () => {
+  const state = await createOpenClawTestState({
+    layout: "state-only",
+    prefix: "users-prefs-session-default-",
+  });
+  try {
+    const profile = ensureProfileForEmail("session-default@example.test");
+    const context = {
+      getRuntimeConfig: () => ({
+        session: { sharing: { drafts: true, defaultVisibility: "private" as const } },
+      }),
+      broadcastToConnIds: vi.fn(),
+      getClientConnIds: vi.fn(() => new Set<string>()),
+    };
+    expect(await invokePreferenceMethod("users.prefs.get", {}, profile.id, context)).toMatchObject({
+      payload: { status: "ok", entries: {} },
+    });
+    expect(
+      await invokePreferenceMethod(
+        "users.prefs.get",
+        { keys: ["gateway.sessions.defaultVisibility"] },
+        profile.id,
+        context,
+      ),
+    ).toMatchObject({
+      payload: {
+        status: "ok",
+        entries: { "gateway.sessions.defaultVisibility": "private" },
+      },
+    });
+    expect(
+      await invokePreferenceMethod(
+        "users.prefs.set",
+        { entries: { "gateway.sessions.defaultVisibility": "shared" } },
+        profile.id,
+        context,
+      ),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_REQUEST" } });
+    expect(
+      await invokePreferenceMethod(
+        "users.prefs.set",
+        { entries: { "sessions.showOthersPrivate": true } },
+        profile.id,
+        context,
+      ),
+    ).toMatchObject({ ok: true, payload: { status: "ok" } });
+    expect(profileShowsOthersPrivate(profile.id)).toBe(true);
+  } finally {
+    await state.cleanup();
+  }
 });
 
 test("users.prefs.set notifies only connections belonging to the same merged profile", async () => {

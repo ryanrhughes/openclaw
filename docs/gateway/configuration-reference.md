@@ -58,7 +58,8 @@ See [Configuration - agents](/gateway/config-agents) for:
 
 - `agents.defaults.*` (workspace, model, thinking, heartbeat, memory, media, skills, sandbox)
 - `multiAgent.*` (multi-agent routing and bindings)
-- `session.*` (session lifecycle, compaction, pruning)
+- `session.*` (session lifecycle, sharing defaults, compaction, pruning), including
+  `session.sharing.defaultVisibility` (`"shared"` or `"private"`)
 - `messages.*` (message delivery, TTS, markdown rendering)
 - `talk.*` (Talk mode)
   - `talk.consultThinkingLevel`: thinking level override for the full OpenClaw agent run behind Control UI Talk realtime consults

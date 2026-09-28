@@ -444,7 +444,16 @@ export function prepareProjectedSessionList(params: {
       const row = getTarget(key);
       const visible = Boolean(
         row &&
-        (client === undefined || (presentation.sharing.entryFilter?.(row.key, entry) ?? true)),
+        (client === undefined ||
+          (presentation.sharing.entryFilter?.(
+            row.key,
+            entry,
+            presentation.target({
+              agentId: row.agentId,
+              key: row.key,
+              storePath: row.storeTarget.storePath,
+            }) ?? undefined,
+          ) ?? true)),
       );
       return (
         visible &&

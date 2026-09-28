@@ -311,7 +311,7 @@ test.each(["research", "ops"] as const)(
   },
 );
 
-test("sessions.describe preserves caller roles and sessions.get hides foreign drafts", async () => {
+test("sessions.describe and sessions.get admit private-session members", async () => {
   const sessionKey = "agent:main:foreign-draft-describe";
   const sessionId = "session-foreign-draft-describe";
   const profileId = (name: string) => ensureProfileForEmail(`${name}@example.com`).id;
@@ -391,7 +391,7 @@ test("sessions.describe preserves caller roles and sessions.get hides foreign dr
       name: "member",
       client: identifiedClient(memberId),
       cfg: roleConfig("view"),
-      hidden: true,
+      hidden: false,
       sharedRole: "member",
     },
     {

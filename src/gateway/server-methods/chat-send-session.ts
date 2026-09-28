@@ -33,6 +33,7 @@ import { assertPreparedSkillLibrarySelection } from "../../skills/library/select
 import { isBrowserOperatorUiClient } from "../../utils/message-channel.js";
 import { authorizeGatewaySessionCreation, resolveCreatorSandbox } from "../operator-role-policy.js";
 import { pendingChatSendDedupeKey } from "../server-shared.js";
+import { resolveNewSessionVisibility } from "../session-profile-preferences.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
 import {
   loadSessionEntry,
@@ -54,6 +55,7 @@ export function prepareChatSendSessionEntry(params: {
   cfg: OpenClawConfig;
   client: GatewayRequestHandlerOptions["client"];
   agentId: string;
+  sessionKey: string;
   getRuntimeConfig: () => OpenClawConfig;
 }): { entry: SessionEntry; assertSkillSelection: () => void } {
   const { cfg, client, agentId, getRuntimeConfig } = params;
@@ -69,6 +71,12 @@ export function prepareChatSendSessionEntry(params: {
   const assertSkillSelection = () =>
     assertPreparedSkillLibrarySelection(creation.skillLibrarySelections);
   const createdAt = Date.now();
+  const visibility = resolveNewSessionVisibility({
+    cfg,
+    creator: creation.actor,
+    isMainSession:
+      params.sessionKey === resolveAgentMainSessionKey({ cfg, agentId: params.agentId }),
+  });
   // A caller's retry ID must never revive a retained transcript window.
   const sessionId = randomUUID();
   return {
@@ -84,6 +92,7 @@ export function prepareChatSendSessionEntry(params: {
       sessionStartedAt: createdAt,
       lastInteractionAt: createdAt,
       chatType: "direct",
+      ...(visibility ? { visibility } : {}),
     },
     assertSkillSelection,
   };
@@ -402,6 +411,7 @@ export async function prepareChatSendNativeRuntimeRestriction(params: {
     cfg,
     client,
     agentId,
+    sessionKey,
     getRuntimeConfig: context.getRuntimeConfig,
   });
   const committed = await commitReplySessionInitialization({

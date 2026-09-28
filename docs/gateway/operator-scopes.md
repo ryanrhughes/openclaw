@@ -182,16 +182,21 @@ For sessions created by other people, `sessions.others` supports these values:
 
 - `"none"`: hides foreign sessions from lists and targeted access, filters
   session-level usage to visible sessions, and denies Gateway-wide `usage.cost`
-  because its aggregate can include hidden sessions.
+  because its aggregate can include hidden sessions. Explicit membership does
+  not override this cap.
 - `"view"`: allows reading but does not allow mutation, even when a session is
   otherwise shared.
 - `"suggest"`: allows viewing and the existing suggestion flow.
-- `"write"`: allows participation in foreign sessions. Draft and incognito
-  restrictions remain in force.
+- `"write"`: allows participation in foreign sessions. Explicit membership
+  activates a private (`draft`) session within this cap; incognito restrictions
+  remain in force.
 
-A person always owns their own sessions. Explicit session membership can raise
-`"view"` or `"suggest"` access for a specific session, and connections already
-holding `operator.admin` retain their administrative session access.
+A person always owns their own sessions. Explicit session membership grants at
+least view access to a private session and permits participation only when the
+role cap permits it. Connections already holding `operator.admin` retain direct
+administrative access. Admin profiles omit other people's private sessions from
+lists and live events by default; the `sessions.showOthersPrivate` preference
+restores that discovery view without changing direct access.
 
 Set `agents: "*"` to allow session creation and agent runs on every agent, list
 agent IDs to allow only those agents, or use an empty array to disallow both.

@@ -71,8 +71,18 @@ export const SessionSchema = z
         readOnly: z.boolean().optional(),
         suggest: z.boolean().optional(),
         drafts: z.boolean().optional(),
+        defaultVisibility: z.enum(["shared", "private"]).optional(),
       })
       .strict()
+      .superRefine((value, ctx) => {
+        if (value.drafts === false && value.defaultVisibility === "private") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["defaultVisibility"],
+            message: 'defaultVisibility cannot be "private" when drafts are disabled',
+          });
+        }
+      })
       .optional(),
     maintenance: z
       .object({

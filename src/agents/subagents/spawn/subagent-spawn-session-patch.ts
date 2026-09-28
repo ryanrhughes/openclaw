@@ -211,6 +211,9 @@ export async function createInitialSubagentSession(params: {
             }
           : {}),
         ...childSessionIdentity,
+        ...(params.cfg.session?.sharing?.drafts !== false && parentEntry?.visibility === "draft"
+          ? { visibility: "draft" as const }
+          : {}),
         ...(parentEntry?.skillLibrarySelections
           ? {
               skillLibrarySelections: parentEntry.skillLibrarySelections.map((selection) => ({
