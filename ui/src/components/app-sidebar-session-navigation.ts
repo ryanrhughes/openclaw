@@ -2,7 +2,10 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 import type { PropertyValues } from "lit";
 import { state } from "lit/decorators.js";
 import type { SessionObserverDigest } from "../../../packages/gateway-protocol/src/schema/sessions.js";
+import type { UsersPrefsGetResult } from "../../../packages/gateway-protocol/src/schema/users.ts";
 import type { GatewaySessionRow, SessionsListResult } from "../api/types.ts";
+import { readGatewayOperatorAccess } from "../app/operator-access.ts";
+import { saveUserPreferences } from "../app/user-prefs-cache.ts";
 import { serializeSidebarEntry } from "../app-navigation.ts";
 import { isSessionRouteId } from "../app-route-paths.ts";
 import { t } from "../i18n/index.ts";
@@ -82,6 +85,8 @@ import type { SessionOwnerOption } from "./session-owner-chip.ts";
 import { SessionOwnerFilterController } from "./session-owner-filter-controller.ts";
 import { SidebarEmptyGroupsController } from "./sidebar-empty-groups-controller.ts";
 import type { SidebarMenusController } from "./sidebar-menus-controller.ts";
+
+const SHOW_OTHERS_PRIVATE_KEY = "sessions.showOthersPrivate";
 
 /** Session-row projection, selection, sorting, and agent scope navigation. */
 export class AppSidebarSessionNavigationElement extends AppSidebarBase {
@@ -174,6 +179,48 @@ export class AppSidebarSessionNavigationElement extends AppSidebarBase {
   @state() sessionsShowCron = loadStoredSidebarSessionsShowCron();
   @state() sessionsShowPreview = loadStoredSidebarSessionsShowPreview();
   @state() sessionsShowSystem = loadStoredSidebarSessionsShowSystem();
+  @state() sessionsShowOthersPrivate = false;
+  private sessionsShowOthersPrivateClient: unknown;
+
+  /**
+   * Admin-only sidebar declutter backed by the Gateway-enforced profile preference;
+   * undefined hides the toggle for everyone else.
+   */
+  get sessionsShowOthersPrivateOption(): boolean | undefined {
+    const snapshot = this.context?.gateway.snapshot;
+    if (!snapshot?.selfUser?.id || !readGatewayOperatorAccess(snapshot).canAdmin) {
+      return undefined;
+    }
+    const client = snapshot.client;
+    if (client && this.sessionsShowOthersPrivateClient !== client) {
+      this.sessionsShowOthersPrivateClient = client;
+      void client
+        .request<UsersPrefsGetResult>("users.prefs.get", { keys: [SHOW_OTHERS_PRIVATE_KEY] })
+        .then(
+          (result) => {
+            if (this.sessionsShowOthersPrivateClient === client && result.status === "ok") {
+              this.sessionsShowOthersPrivate = result.entries[SHOW_OTHERS_PRIVATE_KEY] === true;
+            }
+          },
+          () => undefined,
+        );
+    }
+    return this.sessionsShowOthersPrivate;
+  }
+
+  setSessionsShowOthersPrivate(show: boolean) {
+    const client = this.context?.gateway.snapshot.client;
+    if (!client) {
+      return;
+    }
+    this.sessionsShowOthersPrivate = show;
+    void saveUserPreferences(client, { entries: { [SHOW_OTHERS_PRIVATE_KEY]: show } }).then(
+      () => this.sessionData.refreshSidebarSessions(),
+      () => {
+        this.sessionsShowOthersPrivate = !show;
+      },
+    );
+  }
   private readonly emptyGroups = new SidebarEmptyGroupsController(this, () => this.context);
 
   get sessionsEmptyGroupsMode(): SidebarEmptyGroupsMode {

@@ -281,6 +281,7 @@ export class NewSessionDraftController {
   }
 
   synchronizeSelections() {
+    this.submission.loadDefaultVisibility(this.gateway.connected ? this.gateway.client : null);
     const modelDefaultsPolicy = this.read().context?.config?.current.newSessionModelDefaults;
     if (!this.place.agentsHydrated && this.agentsReady()) {
       this.place.setAgentsHydrated(true);

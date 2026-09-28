@@ -329,6 +329,7 @@ export function renderSidebarSessionSortMenu(params: {
   showCron: boolean;
   showPreview: boolean;
   showSystem: boolean;
+  showOthersPrivate?: boolean;
   emptyGroupsMode: SidebarEmptyGroupsMode;
   owners: readonly SessionOwnerOption[];
   ownerFilterId: string | null;
@@ -344,6 +345,7 @@ export function renderSidebarSessionSortMenu(params: {
   onShowCronChange: (show: boolean) => void;
   onShowPreviewChange: (show: boolean) => void;
   onShowSystemChange: (show: boolean) => void;
+  onShowOthersPrivateChange?: (show: boolean) => void;
   onEmptyGroupsModeChange: (mode: SidebarEmptyGroupsMode) => void;
   onOpenSessionSources: () => void;
   onClose: (restoreFocus: boolean) => void;
@@ -485,6 +487,16 @@ export function renderSidebarSessionSortMenu(params: {
           )}
           ${switchItem("sidebar-sessions-cron", t("sessionsView.showCronSessions"), params.showCron, params.onShowCronChange)}
           ${switchItem("sidebar-sessions-system", t("sessionsView.showSystemSessions"), params.showSystem, params.onShowSystemChange)}
+          ${
+            params.showOthersPrivate === undefined || !params.onShowOthersPrivateChange
+              ? nothing
+              : switchItem(
+                  "sidebar-sessions-others-private",
+                  t("sessionsView.showOthersPrivateSessions"),
+                  params.showOthersPrivate,
+                  params.onShowOthersPrivateChange,
+                )
+          }
         </section>
         <section
           class="sidebar-session-menu-section"
