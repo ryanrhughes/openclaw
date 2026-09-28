@@ -21,9 +21,10 @@ import {
   SessionMutationAuthorizationChangedError,
 } from "./session-sharing.js";
 import {
-  sharingPolicyClient as client,
+  publishDatabaseMembershipSnapshotForTest,
   roleClient,
   rolePolicyConfig,
+  sharingPolicyClient as client,
 } from "./session-sharing.test-utils.js";
 
 afterEach(() => closeOpenClawAgentDatabasesForTest());
@@ -423,6 +424,7 @@ describe("session sharing policy", () => {
         { identityId: restrictedId, addedBy: creatorId, expectedSessionId: foreignEntry.sessionId },
       );
 
+      publishDatabaseMembershipSnapshotForTest();
       const entryFilter = createSessionListEntryFilter({ cfg, client: restricted });
       const creatorEntryFilter = createSessionListEntryFilter({ cfg, client: creator });
       expect(entryFilter?.(foreignKey, foreignEntry)).toBe(false);
@@ -964,6 +966,7 @@ describe("session sharing policy", () => {
         { agentId: "main", sessionKey },
         { identityId: cappedMemberId, addedBy: "owner", expectedSessionId: "session-draft" },
       );
+      publishDatabaseMembershipSnapshotForTest();
       const check = (user: string, event: string) =>
         canReceiveSessionEvent({
           cfg: {},

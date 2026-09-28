@@ -35,6 +35,7 @@ import {
   createSessionListEntryFilter,
   invalidateSessionSharingSnapshot,
 } from "../session-sharing.js";
+import { publishDatabaseMembershipSnapshotForTest } from "../session-sharing.test-utils.js";
 import { createControlUiHandlers } from "./control-ui.js";
 import { flushPendingSessionsChangedEvents } from "./session-change-event.js";
 import { initializeSessionReadContext } from "./sessions-read-cache.test-support.js";
@@ -734,6 +735,7 @@ describe("session sharing handlers", () => {
         ["sessions.reclaim", { key: sessionKey }],
         ["exec.approval.resolve", { id: "approval-1" }],
       ];
+      publishDatabaseMembershipSnapshotForTest();
       const expectAccess = (allowed: boolean) => {
         for (const [method, requestParams] of mutations) {
           const error = resolveSessionMutationAuthorization({
