@@ -251,7 +251,7 @@ function renderSidebarSessionIndicators(
     ${
       session.visibility === "draft"
         ? html`<span class="session-row-draft-indicator" title=${t("chat.sessionSharing.draft")}
-            >👻</span
+            >${session.draftAdminView ? "👻" : icons.lock}</span
           >`
         : nothing
     }</span

@@ -125,6 +125,8 @@ export type SidebarRecentSession = {
   archived?: boolean;
   visibility?: SessionVisibility;
   draftOwnedBySelf?: boolean;
+  /** Someone else's private session, visible only through an admin's opt-in. */
+  draftAdminView?: boolean;
   category?: string;
   icon?: string;
   color?: string;
