@@ -761,9 +761,9 @@ describe("new-session composer attachment drops", () => {
     const draftPill = composer.querySelector<HTMLButtonElement>('[role="switch"]');
     const visibleDraftButtons = Array.from(
       composer.querySelectorAll<HTMLButtonElement>(".agent-chat__composer-footer button"),
-    ).filter((button) => button.textContent?.trim() === "Draft");
+    ).filter((button) => button.textContent?.trim() === "Private");
 
-    expect(draftPill?.textContent).toContain("Draft");
+    expect(draftPill?.textContent).toContain("Private");
     expect(draftPill?.getAttribute("aria-checked")).toBe("true");
     expect(visibleDraftButtons).toEqual([draftPill]);
 

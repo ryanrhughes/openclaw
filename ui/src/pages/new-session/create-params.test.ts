@@ -126,6 +126,23 @@ describe("buildDraftSessionCreateParams", () => {
     });
   });
 
+  it("makes an unchecked Private toggle explicitly shared only under a private default", () => {
+    const base = { agentId: "main", message: "team kickoff", worktree: false } as const;
+    expect(
+      buildDraftSessionCreateParams({ ...base, visibility: "normal", defaultVisibility: "private" }),
+    ).toEqual({ agentId: "main", message: "team kickoff", visibility: "shared" });
+    expect(
+      buildDraftSessionCreateParams({ ...base, visibility: "normal", defaultVisibility: "shared" }),
+    ).toEqual({ agentId: "main", message: "team kickoff" });
+    expect(buildDraftSessionCreateParams({ ...base, visibility: "normal" })).toEqual({
+      agentId: "main",
+      message: "team kickoff",
+    });
+    expect(
+      buildDraftSessionCreateParams({ ...base, visibility: "draft", defaultVisibility: "private" }),
+    ).toEqual({ agentId: "main", message: "team kickoff", visibility: "draft" });
+  });
+
   it("includes initial-message attachments", () => {
     const attachments = [
       { type: "image", mimeType: "image/png", fileName: "pixel.png", content: "aGVsbG8=" },

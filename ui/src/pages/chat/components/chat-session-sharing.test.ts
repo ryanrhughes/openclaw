@@ -432,7 +432,7 @@ describe("chat session sharing menu", () => {
     );
 
     const publish = root.querySelector<HTMLElement>(".chat-pane__publish-draft");
-    expect(publish?.textContent).toContain("Publish draft");
+    expect(publish?.textContent).toContain("Share with team");
     root.querySelector("wa-dropdown")?.dispatchEvent(
       new CustomEvent("wa-select", {
         detail: { item: { value: publish?.getAttribute("value") } },

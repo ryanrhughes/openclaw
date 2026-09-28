@@ -394,6 +394,7 @@ export function renderSidebarSessionSortMenu(params: {
   showCron: boolean;
   showPreview: boolean;
   showSystem: boolean;
+  showOthersPrivate?: boolean;
   emptyGroupsMode: SidebarEmptyGroupsMode;
   owners: readonly SessionOwnerOption[];
   ownerFilterId: string | null;
@@ -409,6 +410,7 @@ export function renderSidebarSessionSortMenu(params: {
   onShowCronChange: (show: boolean) => void;
   onShowPreviewChange: (show: boolean) => void;
   onShowSystemChange: (show: boolean) => void;
+  onShowOthersPrivateChange?: (show: boolean) => void;
   onEmptyGroupsModeChange: (mode: SidebarEmptyGroupsMode) => void;
   onOpenSessionSources: () => void;
   onClose: (restoreFocus: boolean) => void;
@@ -455,6 +457,8 @@ export function renderSidebarSessionSortMenu(params: {
             params.onShowCronChange(!params.showCron);
           } else if (value === "show-system") {
             params.onShowSystemChange(!params.showSystem);
+          } else if (value === "show-others-private") {
+            params.onShowOthersPrivateChange?.(!params.showOthersPrivate);
           } else {
             const option = EMPTY_GROUPS_OPTIONS.find(
               (candidate) => value === `empty-groups:${candidate.mode}`,
@@ -571,6 +575,23 @@ export function renderSidebarSessionSortMenu(params: {
                     >${params.showSystem ? icons.check : nothing}</span
                   >
                 </wa-dropdown-item>
+                ${
+                  params.showOthersPrivate === undefined
+                    ? nothing
+                    : html`<wa-dropdown-item
+                        class="sidebar-session-sort-menu__item"
+                        type="checkbox"
+                        value="show-others-private"
+                        .checked=${params.showOthersPrivate}
+                      >
+                        <span class="session-menu__text"
+                          >${t("sessionsView.showOthersPrivateSessions")}</span
+                        >
+                        <span slot="details" class="session-menu__check" aria-hidden="true"
+                          >${params.showOthersPrivate ? icons.check : nothing}</span
+                        >
+                      </wa-dropdown-item>`
+                }
                 ${
                   params.rosterMode
                     ? nothing

@@ -1,4 +1,6 @@
 import type { ProjectsAddResult } from "../../../../packages/gateway-protocol/src/index.js";
+import type { UsersPrefsGetResult } from "../../../../packages/gateway-protocol/src/schema/users.ts";
+import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import { t } from "../../i18n/index.ts";
 import { registerNewSessionSetupEnglish } from "../../i18n/locales/en-new-session-setup.ts";
 import type { ChatAttachment, HumanMention } from "../../lib/chat/chat-types.ts";
@@ -60,6 +62,9 @@ type SubmittedDraft = ReturnType<NewSessionDraftPersistence["captureSubmission"]
 
 export class DraftSubmissionFlow {
   private visibilityValue: NewSessionVisibility = "normal";
+  private defaultVisibilityValue: "shared" | "private" | undefined;
+  private visibilityTouched = false;
+  private defaultVisibilityClient: unknown;
   private messageText = "";
 
   private get messageValue(): string {
@@ -116,7 +121,7 @@ export class DraftSubmissionFlow {
           message,
           mentions,
           attachments,
-          visibility: resetVisibility ? "normal" : this.visibilityValue,
+          visibility: resetVisibility ? this.initialVisibility() : this.visibilityValue,
         });
       },
       () => this.setError(CHAT_COMPOSER_DRAFT_STORAGE_ERROR),
@@ -130,6 +135,43 @@ export class DraftSubmissionFlow {
 
   get visibility(): NewSessionVisibility {
     return this.visibilityValue;
+  }
+
+  get defaultVisibility(): "shared" | "private" | undefined {
+    return this.defaultVisibilityValue;
+  }
+
+  private initialVisibility(): NewSessionVisibility {
+    return this.defaultVisibilityValue === "private" ? "draft" : "normal";
+  }
+
+  /** Preselects Private from the person's effective default: their preference, else the Gateway's. */
+  loadDefaultVisibility(client: GatewayBrowserClient | null | undefined) {
+    if (!client || this.defaultVisibilityClient === client) {
+      return;
+    }
+    this.defaultVisibilityClient = client;
+    void client
+      .request<UsersPrefsGetResult>("users.prefs.get", {
+        keys: ["sessions.defaultVisibility", "gateway.sessions.defaultVisibility"],
+      })
+      .then(
+        (result) => {
+          if (this.defaultVisibilityClient !== client || result.status !== "ok") {
+            return;
+          }
+          const pick = (value: unknown) =>
+            value === "private" || value === "shared" ? value : undefined;
+          this.defaultVisibilityValue =
+            pick(result.entries["sessions.defaultVisibility"]) ??
+            pick(result.entries["gateway.sessions.defaultVisibility"]);
+          if (!this.visibilityTouched && this.visibilityValue !== "incognito") {
+            this.visibilityValue = this.initialVisibility();
+            this.callbacks.requestUpdate();
+          }
+        },
+        () => undefined,
+      );
   }
 
   get message(): string {
@@ -220,6 +262,7 @@ export class DraftSubmissionFlow {
 
   setVisibility(visibility: NewSessionVisibility) {
     this.startedSession.current = null;
+    this.visibilityTouched = true;
     const wasIncognito = this.visibilityValue === "incognito";
     const publish = this.callbacks.requestUpdate;
     this.visibilityValue = visibility;
@@ -357,7 +400,8 @@ export class DraftSubmissionFlow {
     this.submissionOutcomeUnknown = preservePendingPlacement
       ? (this.submissionOutcomeUnknown ?? "placement-interrupted")
       : null;
-    this.visibilityValue = "normal";
+    this.visibilityValue = this.initialVisibility();
+    this.visibilityTouched = false;
     this.capabilities.reset();
     this.permission.reset();
     this.attachmentDraft.reset({ release: true });
