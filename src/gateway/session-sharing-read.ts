@@ -175,8 +175,16 @@ export function prepareSessionSharing(
       {
         ...params,
         target,
+        // Prepared membership includes the private root so inherited-private children
+        // authorize root members the same way the list filter does.
         isMember:
-          isMember ?? (prepared && Boolean(identity && prepared.isMember(target, identity.id))),
+          isMember ??
+          (prepared &&
+            Boolean(
+              identity &&
+              (prepared.isMember(target, identity.id) ||
+                snapshotMember(target.entry.privateAccessRoot, identity.id)),
+            )),
       },
       prepared && { value: prepared.sessionCap },
       isCreator,
