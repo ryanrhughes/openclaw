@@ -172,4 +172,42 @@ test("private sessions outcome matrix", async () => {
       event: "session.message",
     }),
   ).toBe(true);
+
+  // A none-capped admin keeps shared-session events; only uninvited private events filter.
+  const noneAdmin = roleClient("none", "private-matrix-f");
+  noneAdmin.connect.scopes = ["operator.admin"];
+  const adminEvent = (key: string) =>
+    canReceiveSessionEvent({
+      cfg,
+      client: noneAdmin,
+      sessionKeys: [key],
+      agentId: "main",
+      event: "session.message",
+    });
+  expect(adminEvent(shared.payload!.key)).toBe(true);
+  expect(adminEvent(sessionKey)).toBe(false);
+
+  // Without gateway.roles, uninvited profiles still cannot read a private session by key.
+  const noRoles: OpenClawConfig = { ...cfg, gateway: { ...cfg.gateway, roles: undefined } };
+  const noRolesContext = { getRuntimeConfig: () => noRoles };
+  const read = async (client: (typeof profiles)[keyof typeof profiles]) => ({
+    describe: (
+      await directSessionReq<{ session: unknown }>(
+        "sessions.describe",
+        { key: sessionKey },
+        { client, context: noRolesContext },
+      )
+    ).payload?.session,
+    messages: (
+      await directSessionReq<{ messages: unknown[] }>(
+        "sessions.get",
+        { key: sessionKey },
+        { client, context: noRolesContext },
+      )
+    ).payload?.messages,
+  });
+  expect(await read(profiles.C)).toEqual({ describe: null, messages: [] });
+  const invited = await read(profiles.B);
+  expect(invited.describe).not.toBeNull();
+  expect(invited.messages?.length ?? 0).toBeGreaterThan(0);
 });

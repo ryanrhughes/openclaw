@@ -410,10 +410,11 @@ test("sessions.describe and sessions.get admit private-session members", async (
     },
     { name: "admin", client: admin, cfg: roleConfig("view"), hidden: false, sharedRole: "admin" },
     {
+      // Private sessions stay hidden from uninvited profiles even without gateway.roles.
       name: "no roles",
       client: identifiedClient(profileId("draft-outsider")),
       cfg: {},
-      hidden: false,
+      hidden: true,
       sharedRole: "viewer",
     },
   ] as const;

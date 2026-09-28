@@ -1,4 +1,4 @@
-import { isSessionMember, type SessionEntry } from "../config/sessions.js";
+import type { SessionEntry } from "../config/sessions.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isIncognitoSessionKey } from "../routing/session-key.js";
 import { operatorScopeSatisfied } from "../shared/operator-scope-compat.js";
@@ -11,6 +11,7 @@ import {
 } from "./operator-role-policy.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { isSessionCreatorProfile, prepareSessionCreatorProfile } from "./session-creator.js";
+import { readSessionMembershipSnapshot } from "./session-membership-snapshot.js";
 import { profileShowsOthersPrivate } from "./session-profile-preferences.js";
 import {
   authorizeSessionSharingTarget,
@@ -112,7 +113,8 @@ export function canReceiveSessionEvent(params: {
         }
       : loadSharingSnapshot({ cfg, ...lookup, sessionKey });
     const isCreator = sharing.isCreator(snapshot.createdActor);
-    if ((snapshot.incognito && !admin) || (hidesForeignSessions && !isCreator)) {
+    // Admins keep stock event access to non-private sessions; only others' private ones filter.
+    if ((snapshot.incognito && !admin) || (hidesForeignSessions && !isCreator && !admin)) {
       return false;
     }
     if (snapshot.visibility !== "draft" || isCreator) {
@@ -122,10 +124,8 @@ export function canReceiveSessionEvent(params: {
     if (!privateTarget) {
       return false;
     }
-    if (admin) {
-      return Boolean(identity && sharing.isMember(privateTarget, identity.id));
-    }
-    return sharing.roleForTarget(privateTarget) !== "viewer";
+    // Membership comes from the published snapshot; a none cap was rejected above for non-admins.
+    return sharing.isMember(privateTarget, identity.id);
   });
   if (!visible || event !== "session.suggestion") {
     return visible;
@@ -170,14 +170,10 @@ export function prepareSessionSharing(
     isCreator,
     isMember: (target: SessionSharingTarget, identityId: string) =>
       prepared?.isMember(target, identityId) ??
-      isSessionMember(
-        {
-          agentId: target.agentId,
-          sessionKey: target.storeKey,
-          storePath: target.storePath,
-        },
-        identityId,
-      ),
+      readSessionMembershipSnapshot({
+        sessionKey: target.storeKey,
+        storePath: target.storePath,
+      })?.includes(identityId) === true,
     sessionCap: prepared?.sessionCap,
     entryFilter: createSessionListEntryFilter(params, isCreator, prepared),
     roleForTarget,
@@ -258,23 +254,17 @@ export function createSessionListEntryFilter(
     if (!sessionKey) {
       return false;
     }
-    const resolved =
-      target ??
-      prepared?.target?.(sessionKey) ??
-      (params.cfg ? resolveSessionSharingTarget({ cfg: params.cfg, sessionKey }) : null);
-    if (!resolved) {
-      return false;
+    // Never query SQLite here: prepared projections or the published membership snapshot only.
+    const resolved = target ?? prepared?.target?.(sessionKey) ?? null;
+    if (resolved && prepared?.isMember) {
+      return prepared.isMember(resolved, identity.id);
     }
-    return prepared?.isMember
-      ? prepared.isMember(resolved, identity.id)
-      : isSessionMember(
-          {
-            agentId: resolved.agentId,
-            sessionKey: resolved.storeKey,
-            storePath: resolved.storePath,
-          },
-          identity.id,
-        );
+    return (
+      readSessionMembershipSnapshot({
+        sessionKey: resolved?.storeKey ?? sessionKey,
+        storePath: resolved?.storePath,
+      })?.includes(identity.id) === true
+    );
   };
   return (sessionKey, entry, target) => {
     if (!admin && (entry.incognito === true || isIncognitoSessionKey(sessionKey))) {

@@ -453,7 +453,8 @@ export function prepareProjectedSessionList(params: {
               key: row.key,
               storePath: row.storeTarget.storePath,
             }) ?? undefined,
-          ) ?? true)),
+          ) ??
+            true)),
       );
       return (
         visible &&
