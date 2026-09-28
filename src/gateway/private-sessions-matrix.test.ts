@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { upsertSessionEntryCore } from "../config/sessions/session-accessor.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { setCanonicalUserPreferences } from "../state/user-preferences.js";
 import {
@@ -172,6 +173,41 @@ test("private sessions outcome matrix", async () => {
       event: "session.message",
     }),
   ).toBe(true);
+
+  // An inherited-private child (e.g. a subagent spawned by invited member B) stays reachable
+  // for members of its private root; uninvited profiles still see nothing.
+  const childKey = "agent:main:dashboard:private-matrix-child";
+  await upsertSessionEntryCore(
+    { agentId: "main", sessionKey: childKey, storePath },
+    {
+      sessionId: "private-matrix-child-session",
+      updatedAt: Date.now(),
+      createdActor: { type: "human", source: "profile", id: profileId("A") },
+      visibility: "draft",
+      privateAccessRoot: sessionKey,
+      parentSessionKey: sessionKey,
+    },
+  );
+  const childListed = async (profile: keyof typeof profiles) =>
+    (
+      await directSessionReq<{ sessions: Array<{ key: string }> }>(
+        "sessions.list",
+        { agentId: "main" },
+        { client: profiles[profile], context },
+      )
+    ).payload?.sessions.some((session) => session.key === childKey) ?? false;
+  expect(await childListed("B")).toBe(true);
+  expect(await childListed("C")).toBe(false);
+  const childEvent = (profile: keyof typeof profiles) =>
+    canReceiveSessionEvent({
+      cfg,
+      client: profiles[profile],
+      sessionKeys: [childKey],
+      agentId: "main",
+      event: "session.message",
+    });
+  expect(childEvent("B")).toBe(true);
+  expect(childEvent("C")).toBe(false);
 
   // Explicit-key reads are direct access for an admin who has not opted in, while lists
   // and events stay filtered (row D above).

@@ -375,8 +375,14 @@ export async function persistAgentSessionPhase(params: {
               ? { ...lifecyclePatch, ...rotationLineage }
               : {
                   ...lifecyclePatch,
+                  // A delegated private default stamps the same operator it was resolved
+                  // for, like a newly required sandbox, so that person keeps access.
                   ...buildSessionCreationStamp(
-                    sandbox ? { ...delegatedCreation, sandbox } : params.creation,
+                    sandbox
+                      ? { ...delegatedCreation, sandbox }
+                      : defaultVisibility === "draft" && !params.creation.actor
+                        ? delegatedCreation
+                        : params.creation,
                   ),
                   ...(defaultVisibility ? { visibility: defaultVisibility } : {}),
                 };

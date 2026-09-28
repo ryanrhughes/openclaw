@@ -186,7 +186,13 @@ export async function createInitialSubagentSession(params: {
             }
           : {}),
         ...childSessionIdentity,
-        ...(inheritsPrivate ? { visibility: "draft" as const } : {}),
+        ...(inheritsPrivate
+          ? {
+              visibility: "draft" as const,
+              // Members of the private root keep access through every inherited child.
+              privateAccessRoot: parentEntry?.privateAccessRoot ?? params.requesterInternalKey,
+            }
+          : {}),
         ...(parentEntry?.skillLibrarySelections
           ? {
               skillLibrarySelections: parentEntry.skillLibrarySelections.map((selection) => ({

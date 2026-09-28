@@ -90,6 +90,91 @@ describe("persistAgentSessionPhase", () => {
     });
   });
 
+  it("stamps the delegated operator on a new private-default run so the operator keeps access", async () => {
+    await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
+      const profile = ensureProfileForEmail("synthetic-private-creator@example.com");
+      const sessionKey = "agent:main:synthetic-private";
+      const runId = "synthetic-private-run";
+      const storePath = state.statePath("agents", "main", "sessions", "sessions.json");
+      const patchBuild: AgentSessionPatchBuild = {
+        patch: { sessionId: runId, updatedAt: 1 },
+        spawnedBy: undefined,
+        groupId: undefined,
+        groupChannel: undefined,
+        groupSpace: undefined,
+        freshSessionRotatedSinceLoad: false,
+        isNewSession: true,
+        rotatedSessionId: false,
+        usableRequestedSessionId: undefined,
+        freshness: undefined,
+      };
+
+      const committed = vi.fn((entry: { sessionId: string }) => {
+        expect(loadSessionEntry({ agentId: "main", sessionKey, storePath })?.sessionId).toBe(
+          entry.sessionId,
+        );
+      });
+      const result = await persistAgentSessionPhase({
+        onSessionCommitted: committed,
+        request: { message: "sandboxed", idempotencyKey: runId },
+        cfg: {
+          gateway: {
+            roles: {
+              default: "guest",
+              definitions: {
+                guest: {
+                  sessions: { others: "view" },
+                  agents: ["main"],
+                  scopes: ["operator.write"],
+                },
+              },
+            },
+          },
+          session: { sharing: { defaultVisibility: "private" } },
+        },
+        storePath,
+        canonicalSessionKey: sessionKey,
+        sessionAgentId: "main",
+        mainSessionKey: "agent:main:main",
+        creation: { via: "run" },
+        operatorRoleActor: { kind: "operator", profileId: profile.id },
+        lifecycleGeneration: getAgentEventLifecycleGeneration(),
+        isRestartRecoveryResumeRun: false,
+        runId,
+        agentId: "main",
+        suppressVisibleSessionEffects: false,
+        initialPatchBuild: patchBuild,
+        buildSessionPatch: () => patchBuild,
+        initialSessionPersistedBeforeGatewayAdmission: false,
+        touchInteraction: false,
+        bestEffortDeliver: false,
+        expectedSession: undefined,
+        maintenanceConfig: undefined,
+        abortForLifecycleRotation: () => false,
+        assertGatewayWorkAdmissionAllowed: vi.fn(),
+        respondToGatewayAdmissionOutcome: () => false,
+        updateAdmissionState: vi.fn(),
+        getAdmittedSessionId: () => runId,
+        setCronContinuationClaim: vi.fn(),
+        setMainRestartRecoveryOwnerLease: vi.fn(),
+        respond: vi.fn(),
+      });
+
+      expect(result?.sessionEntry).toMatchObject({
+        createdVia: "run",
+        createdActor: { type: "human", id: profile.id },
+        visibility: "draft",
+      });
+      expect(result?.sessionEntry?.sandbox).toBeUndefined();
+      expect(committed).toHaveBeenCalledOnce();
+      expect(committed.mock.calls[0]?.[0].sessionId).toBe(result?.sessionEntry?.sessionId);
+      expect(loadSessionEntry({ agentId: "main", sessionKey, storePath })).toMatchObject({
+        createdActor: { type: "human", id: profile.id },
+        visibility: "draft",
+      });
+    });
+  });
+
   it("surfaces session creation authorization failures before concurrent lifecycle rotation", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
       const sessionKey = "agent:main:role-denied";

@@ -271,6 +271,8 @@ type SessionEntryCore = SessionRestartRecoveryState &
   Pick<SessionRow, "permissionMode" | "sandboxMode" | "nativeRuntimeConsent" | "sessionRoot"> & {
     /** Collaboration mode. Missing legacy values are equivalent to "shared". */
     visibility?: NonNullable<SessionRow["visibility"]>;
+    /** Private root session whose members also reach this inherited-private child session. */
+    privateAccessRoot?: string;
     /**
      * Last delivered heartbeat payload (used to suppress duplicate heartbeat notifications).
      * Stored on the main session entry.
