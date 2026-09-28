@@ -126,6 +126,8 @@ export type SidebarRecentSession = {
   visibility?: SessionVisibility;
   sharingRole?: GatewaySessionRow["sharingRole"];
   draftOwnedBySelf?: boolean;
+  /** Someone else's private session, visible only through an admin's opt-in. */
+  draftAdminView?: boolean;
   category?: string;
   icon?: string;
   color?: string;
