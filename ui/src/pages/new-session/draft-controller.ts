@@ -146,6 +146,7 @@ export class NewSessionDraftController {
   }
 
   synchronizeSelections() {
+    this.submission.loadDefaultVisibility(this.gateway.connected ? this.gateway.client : null);
     if (!this.place.agentsHydrated && this.agentsReady()) {
       this.place.setAgentsHydrated(true);
       this.place.adoptAgentDefaults({ preserveSelectedAgent: true, preserveSelectedFolder: true });

@@ -219,6 +219,10 @@ export function buildSidebarSessionNavigationState(input: {
       archived: row.archived === true,
       visibility: row.visibility,
       draftOwnedBySelf: isSidebarDraftOwnedBySelf(row, context?.gateway.snapshot.selfUser?.id),
+      draftAdminView:
+        row.visibility === "draft" &&
+        row.sharingRole === "admin" &&
+        !isSidebarDraftOwnedBySelf(row, context?.gateway.snapshot.selfUser?.id),
       category: normalizeOptionalString(row.category),
       icon: normalizeOptionalString(row.icon),
       color: normalizeOptionalString(row.color),

@@ -36,6 +36,8 @@ export interface SidebarMenusControllerHost
   readonly connectionStatus: GatewayStatus | null;
   readonly enabledRouteIds?: readonly NavigationRouteId[];
   readonly gatewayVersion: string | null;
+  readonly sessionsShowOthersPrivateOption: boolean | undefined;
+  setSessionsShowOthersPrivate(show: boolean): void;
   readonly onNavigate?: (
     routeId: NavigationRouteId,
     options?: ApplicationNavigationOptions,
