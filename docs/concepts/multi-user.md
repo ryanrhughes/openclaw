@@ -230,7 +230,7 @@ session always remains shared. Private defaults require
 The creator can invite another profile with session membership. An invited
 member can discover and read the private session, receive its events, and
 participate up to the member's `sessions.others` role cap. A `"none"` cap still
-rejects members. Non-members cannot discover or open the session.
+rejects members. Non-members cannot discover it in lists. With `gateway.roles` configured they also cannot open it by key; without roles every identified profile shares one operator boundary, so private sessions stay out of other people's lists but remain openable by key, as in stock OpenClaw.
 
 Admins retain direct access to private sessions by key. By default, an admin
 with a durable profile does not see other people's private sessions in lists

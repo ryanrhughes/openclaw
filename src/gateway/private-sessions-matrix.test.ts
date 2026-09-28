@@ -187,27 +187,24 @@ test("private sessions outcome matrix", async () => {
   expect(adminEvent(shared.payload!.key)).toBe(true);
   expect(adminEvent(sessionKey)).toBe(false);
 
-  // Without gateway.roles, uninvited profiles still cannot read a private session by key.
+  // Without gateway.roles there is no operator boundary: lists still hide private sessions
+  // from uninvited profiles, and invited members discover and read them.
   const noRoles: OpenClawConfig = { ...cfg, gateway: { ...cfg.gateway, roles: undefined } };
   const noRolesContext = { getRuntimeConfig: () => noRoles };
-  const read = async (client: (typeof profiles)[keyof typeof profiles]) => ({
-    describe: (
-      await directSessionReq<{ session: unknown }>(
-        "sessions.describe",
-        { key: sessionKey },
+  const listedWithoutRoles = async (client: (typeof profiles)[keyof typeof profiles]) =>
+    (
+      await directSessionReq<{ sessions: Array<{ key: string }> }>(
+        "sessions.list",
+        { agentId: "main" },
         { client, context: noRolesContext },
       )
-    ).payload?.session,
-    messages: (
-      await directSessionReq<{ messages: unknown[] }>(
-        "sessions.get",
-        { key: sessionKey },
-        { client, context: noRolesContext },
-      )
-    ).payload?.messages,
-  });
-  expect(await read(profiles.C)).toEqual({ describe: null, messages: [] });
-  const invited = await read(profiles.B);
-  expect(invited.describe).not.toBeNull();
-  expect(invited.messages?.length ?? 0).toBeGreaterThan(0);
+    ).payload?.sessions.some((session) => session.key === sessionKey) ?? false;
+  expect(await listedWithoutRoles(profiles.C)).toBe(false);
+  expect(await listedWithoutRoles(profiles.B)).toBe(true);
+  const invitedHistory = await directSessionReq<{ messages: unknown[] }>(
+    "sessions.get",
+    { key: sessionKey },
+    { client: profiles.B, context: noRolesContext },
+  );
+  expect(invitedHistory.payload?.messages.length ?? 0).toBeGreaterThan(0);
 });

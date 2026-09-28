@@ -3,6 +3,7 @@ import { validateSessionsDescribeParams } from "../../../packages/gateway-protoc
 import type { SessionEntry } from "../../config/sessions.js";
 import { isIncognitoSessionKey } from "../../routing/session-key.js";
 import { projectOperatorModelRead } from "../operator-model-presentation.js";
+import { hasOperatorBoundary } from "../operator-role-policy.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
 import { withReadySessionRows, type SessionRowReadView } from "../session-row-prepared-read.js";
 import { prepareProjectedSessionPresentation } from "../session-row-presentation.js";
@@ -66,7 +67,8 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
         const record = read.describe(query);
         if (
           !record ||
-          (!isGatewayAdmin(client ?? null) &&
+          (hasOperatorBoundary(client, read.state.policyConfig) &&
+            !isGatewayAdmin(client ?? null) &&
             presentation.sharing.entryFilter?.(
               record.key,
               record.entry,
@@ -112,13 +114,12 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       const requested = requestedAgent();
       return requested.ok ? [{ key, agentId: requested.agentId }] : [];
     };
-    // Private sessions stay hidden from uninvited profiles even without gateway.roles;
-    // admins keep direct access by key.
+    // Without gateway.roles, by-key reads keep stock semantics; admins keep direct access by key.
     const hidesPrivateSession = (
       read: SessionRowReadView,
       record: { agentId: string; key: string; entry: SessionEntry },
     ) => {
-      if (isGatewayAdmin(client ?? null)) {
+      if (!hasOperatorBoundary(client, read.state.policyConfig) || isGatewayAdmin(client ?? null)) {
         return false;
       }
       const presentation = prepareProjectedSessionPresentation(read, client);

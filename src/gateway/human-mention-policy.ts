@@ -182,12 +182,10 @@ export function createHumanMentionPolicy(params: {
     if (!scopesAllowRead(scopes)) {
       return undefined;
     }
-    if (scopes.includes(ADMIN_SCOPE)) {
-      return profile;
-    }
     const entryFilter = createProfileSessionEntryFilter({
       profileId: profile.profileId,
       sessionCap: policy?.sessions.others,
+      admin: scopes.includes(ADMIN_SCOPE),
     });
     return entryFilter(target.sessionKey, target.entry) ? profile : undefined;
   }
