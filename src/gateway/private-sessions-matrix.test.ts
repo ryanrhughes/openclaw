@@ -173,6 +173,18 @@ test("private sessions outcome matrix", async () => {
     }),
   ).toBe(true);
 
+  // Explicit-key reads are direct access for an admin who has not opted in, while lists
+  // and events stay filtered (row D above).
+  const adminPreview = await directSessionReq<{
+    previews: Array<{ key: string; status?: string }>;
+  }>("sessions.preview", { keys: [sessionKey] }, { client: profiles.D, context });
+  expect(adminPreview.payload?.previews?.[0]).toMatchObject({ key: sessionKey });
+  expect(adminPreview.payload?.previews?.[0]?.status).not.toBe("missing");
+  const outsiderPreview = await directSessionReq<{
+    previews: Array<{ key: string; status?: string }>;
+  }>("sessions.preview", { keys: [sessionKey] }, { client: profiles.C, context });
+  expect(outsiderPreview.payload?.previews?.[0]?.status ?? "missing").toBe("missing");
+
   // A none-capped admin keeps shared-session events; only uninvited private events filter.
   const noneAdmin = roleClient("none", "private-matrix-f");
   noneAdmin.connect.scopes = ["operator.admin"];

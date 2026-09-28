@@ -26,6 +26,7 @@ import {
 } from "./server-methods/gateway-client-identity.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { isSessionCreatorProfile, prepareSessionCreatorProfile } from "./session-creator.js";
+import { readSessionMembershipSnapshot } from "./session-membership-snapshot.js";
 import {
   prepareGatewaySessionStoreTargetsReadOnly,
   resolveGatewaySessionStoreTargetWithStore,
@@ -207,8 +208,19 @@ export function resolveSessionSharingRole(
   if (sessionCap === "none") {
     return "viewer";
   }
+  // Private-session membership authorizes access, so it must come from prepared facts or the
+  // published membership snapshot rather than a synchronous store read.
+  const privateMember =
+    params.isMember === undefined && resolveSessionVisibility(params.target.entry) === "draft"
+      ? params.includeMembership !== false &&
+        readSessionMembershipSnapshot({
+          sessionKey: params.target.storeKey,
+          storePath: params.target.storePath,
+        })?.includes(identity.id) === true
+      : undefined;
   const member =
     params.isMember ??
+    privateMember ??
     (params.includeMembership !== false &&
       isSessionMember(
         {

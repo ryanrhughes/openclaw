@@ -1526,6 +1526,52 @@ describe("spawnSubagentDirect seam flow", () => {
     },
   );
 
+  it("keeps a private parent's human creator on its private child so the spawner retains access", async () => {
+    await withOpenClawTestState({ prefix: "openclaw-spawn-private-parent-" }, async (state) => {
+      const storePath = state.statePath("agents", "main", "sessions", "sessions.json");
+      const parentSessionKey = "agent:main:dashboard:private-parent";
+      const actor = { type: "human", source: "profile", id: "profile-private-creator" } as const;
+      const parent = await upsertSessionEntryCore(
+        { agentId: "main", sessionKey: parentSessionKey, storePath },
+        {
+          sessionId: "private-parent-session",
+          updatedAt: 1,
+          createdVia: "operator",
+          createdActor: actor,
+          visibility: "draft",
+        },
+      );
+      hoisted.loadSessionStoreMock.mockReturnValue({ [parentSessionKey]: parent });
+      hoisted.configOverride = createConfigOverride({
+        session: { store: storePath },
+        agents: {
+          defaults: { sandbox: { mode: "off" } },
+          entries: { main: { workspace: state.workspaceDir } },
+        },
+      });
+      hoisted.resolveSandboxRuntimeStatusMock.mockImplementation(resolveSandboxRuntimeStatus);
+      let persistedStore: Record<string, Record<string, unknown>> | undefined;
+      installSessionStoreCaptureMock(hoisted.updateSessionStoreMock, {
+        onStore: (store) => {
+          persistedStore = store;
+        },
+      });
+
+      const result = await spawnSubagentDirect(
+        { task: "continue the private work" },
+        { agentSessionKey: parentSessionKey },
+      );
+
+      expect(result.status).toBe("accepted");
+      expect(persistedStore?.[result.childSessionKey as string]).toMatchObject({
+        createdVia: "spawn",
+        createdActor: actor,
+        visibility: "draft",
+        parentSessionKey,
+      });
+    });
+  });
+
   it("rejects a configured-sandbox parent spawning an unsandboxed native child before side effects", async () => {
     hoisted.resolveSandboxRuntimeStatusMock.mockImplementation(({ sessionKey }) => ({
       sandboxed: sessionKey === "agent:main:main",

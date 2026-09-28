@@ -454,7 +454,7 @@ export async function spawnAcpDirect(
         storePath: parentStorePath,
       });
       ctx.assertActive?.();
-      const parentEntry = isIncognitoSessionKey(requesterInternalKey)
+      const inheritedGitContributorProfileIds = isIncognitoSessionKey(requesterInternalKey)
         ? undefined
         : await withSessionEntryReadOnlyInWorker(
             {
@@ -467,12 +467,9 @@ export async function spawnAcpDirect(
               if (!read.ok) {
                 throw read.error;
               }
-              return read.value;
+              return inheritSessionGitContributorProfileIds(read.value);
             },
           );
-      const inheritedGitContributorProfileIds = parentEntry
-        ? inheritSessionGitContributorProfileIds(parentEntry)
-        : undefined;
       const creationStamp = buildSessionCreationStamp({
         via: "spawn",
         actor: { type: "agent", id: requesterAgentId },
@@ -498,9 +495,6 @@ export async function spawnAcpDirect(
             // Navigation parent is stamped at creation so the durable tree edge
             // does not depend on the control-lineage field.
             parentSessionKey: requesterInternalKey,
-            ...(cfg.session?.sharing?.drafts !== false && parentEntry?.visibility === "draft"
-              ? { visibility: "draft" as const }
-              : {}),
             ...childSessionPatch,
             inheritedToolPolicyVersion: 1,
             ...inheritedToolAllowPatch(ctx.inheritedToolAllowlist),
