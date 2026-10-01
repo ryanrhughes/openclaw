@@ -58,6 +58,10 @@ export function applySessionProfilePreferenceChanges(
   preferencesByProfileId.set(profileId, next);
 }
 
+export function hasSessionProfilePreferences(profileId: string): boolean {
+  return preferencesByProfileId.has(profileId);
+}
+
 export function profileShowsOthersPrivate(profileId: string): boolean {
   return preferencesByProfileId.get(profileId)?.showOthersPrivate === true;
 }

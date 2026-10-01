@@ -27,7 +27,11 @@ type PresentationOptions = Omit<
   includeActivitySummary?: boolean;
 };
 
-function toProjectedSessionSharingTarget(record: records.EntryRow): SessionSharingTarget {
+function toProjectedSessionSharingTarget(
+  record: Pick<records.EntryRow, "agentId" | "key" | "entry"> & {
+    storeTarget: Pick<records.EntryRow["storeTarget"], "storePath">;
+  },
+): SessionSharingTarget {
   return {
     agentId: record.agentId,
     canonicalKey: record.key,
@@ -142,11 +146,16 @@ export function prepareProjectedSessionPresentation(
       new Set(
         record.materialized.source.childLinks?.flatMap(({ key, entry }) =>
           client !== undefined &&
+          // Build the child target from the link itself: describe() can materialize from SQLite.
           sharing.entryFilter?.(
             key,
             entry,
-            target({ agentId: record.agentId, key, storePath: record.storeTarget.storePath }) ??
-              undefined,
+            toProjectedSessionSharingTarget({
+              agentId: record.agentId,
+              key,
+              entry,
+              storeTarget: record.storeTarget,
+            }),
           ) === false
             ? [key]
             : [],

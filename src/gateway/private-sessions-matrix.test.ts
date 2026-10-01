@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { upsertSessionEntryCore } from "../config/sessions/session-accessor.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { setCanonicalUserPreferences } from "../state/user-preferences.js";
+import { setUserProfileRole } from "../state/user-profiles.js";
 import {
   attachGatewayLocalUserIngress,
   prepareGatewayLocalUserIngress,
@@ -26,9 +27,24 @@ const { createSessionStoreDir } = setupGatewaySessionsTestHarness();
 test("private sessions outcome matrix", async () => {
   const { storePath } = await createSessionStoreDir();
   const base = (await getGatewayConfigModule()).getRuntimeConfig();
+  const roles = rolePolicyConfig().gateway!.roles!;
   const cfg: OpenClawConfig = {
     ...base,
-    ...rolePolicyConfig(),
+    // Roles cap connection scopes, so admins need an admin-scoped role (as on a real gateway).
+    gateway: {
+      roles: {
+        ...roles,
+        definitions: {
+          ...roles.definitions,
+          administrator: { sessions: { others: "write" }, agents: "*", scopes: ["operator.admin"] },
+          "administrator-none": {
+            sessions: { others: "none" },
+            agents: "*",
+            scopes: ["operator.admin"],
+          },
+        },
+      },
+    },
     session: {
       ...base.session,
       sharing: { ...base.session?.sharing, defaultVisibility: "private" },
@@ -46,6 +62,8 @@ test("private sessions outcome matrix", async () => {
   profiles.E.connect.scopes = ["operator.admin"];
   const profileId = (profile: keyof typeof profiles) =>
     profiles[profile].authenticatedUserProfile!.profileId;
+  setUserProfileRole(profileId("D"), "administrator");
+  setUserProfileRole(profileId("E"), "administrator");
 
   attachGatewayLocalUserIngress(
     profiles.A,
@@ -251,6 +269,7 @@ test("private sessions outcome matrix", async () => {
   // A none-capped admin keeps shared-session events; only uninvited private events filter.
   const noneAdmin = roleClient("none", "private-matrix-f");
   noneAdmin.connect.scopes = ["operator.admin"];
+  setUserProfileRole(noneAdmin.authenticatedUserProfile!.profileId, "administrator-none");
   const adminEvent = (key: string) =>
     canReceiveSessionEvent({
       cfg,

@@ -44,7 +44,7 @@ import {
 import { WRITE_SCOPE, authorizeOperatorScopesForRequiredScope } from "../method-scopes.js";
 import { searchRemoteProjects } from "../project-github-search.js";
 import { getSessionRowProjection } from "../session-row-projection-access.js";
-import { createSessionListEntryFilter } from "../session-sharing.js";
+import { createSessionListEntryFilter, isGatewayAdmin } from "../session-sharing.js";
 import { loadCombinedSessionStoreForGatewayCore } from "../session-utils.js";
 import { startProjectsListDiagnostics } from "./projects-list-diagnostics.js";
 import { listProjectRecents } from "./projects-recents.js";
@@ -219,6 +219,9 @@ async function listObservedProjects(
   const rawCandidates: RawProjectCandidate[] = [];
   const visibilityFilter = createSessionListEntryFilter({ client, cfg });
   const canSeeAll = !visibilityFilter;
+  // Fork: admins who have not opted in to others' private sessions still get a filter; it
+  // hides only those sessions, so unowned and orphaned worktrees stay visible to them.
+  const admin = isGatewayAdmin(client ?? null);
   for (const [sessionKey, entry] of Object.entries(store)) {
     if (visibilityFilter && !visibilityFilter(sessionKey, entry)) {
       continue;
@@ -242,7 +245,7 @@ async function listObservedProjects(
       // visibility policy that admitted the session also owns its managed checkout.
       const ownerId = worktree.ownerKind === "session" ? worktree.ownerId?.trim() : undefined;
       const ownerEntry = ownerId ? store[ownerId] : undefined;
-      if (!ownerId || !ownerEntry || !visibilityFilter?.(ownerId, ownerEntry)) {
+      if (ownerId && ownerEntry ? !visibilityFilter?.(ownerId, ownerEntry) : !admin) {
         continue;
       }
     }

@@ -129,7 +129,11 @@ describe("buildDraftSessionCreateParams", () => {
   it("makes an unchecked Private toggle explicitly shared only under a private default", () => {
     const base = { agentId: "main", message: "team kickoff", worktree: false } as const;
     expect(
-      buildDraftSessionCreateParams({ ...base, visibility: "normal", defaultVisibility: "private" }),
+      buildDraftSessionCreateParams({
+        ...base,
+        visibility: "normal",
+        defaultVisibility: "private",
+      }),
     ).toEqual({ agentId: "main", message: "team kickoff", visibility: "shared" });
     expect(
       buildDraftSessionCreateParams({ ...base, visibility: "normal", defaultVisibility: "shared" }),

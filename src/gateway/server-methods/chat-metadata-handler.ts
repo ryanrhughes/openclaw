@@ -80,10 +80,16 @@ export function resolveChatMetadataReadParams(
     );
     const isCurrent = () => isRequestCurrent() && session.isCurrent();
     const assertVisible = () => {
-      const visible = createSessionListEntryFilter({
-        client,
-        cfg: (context.getCommittedRuntimeConfig ?? context.getRuntimeConfig)(),
-      });
+      // Direct read by key: admins keep access to named private sessions.
+      const visible = createSessionListEntryFilter(
+        {
+          client,
+          cfg: (context.getCommittedRuntimeConfig ?? context.getRuntimeConfig)(),
+        },
+        undefined,
+        undefined,
+        { adminDirectAccess: true },
+      );
       if (
         session.entry &&
         visible?.(session.legacyKey ?? session.canonicalKey, session.entry) === false

@@ -16,6 +16,7 @@ import {
 } from "../config/sessions/session-accessor.js";
 import type { GatewayAuthConfig, GatewayOperatorRolesConfig } from "../config/types.gateway.js";
 import { listSystemPresence, type SystemPresence } from "../infra/system-presence.js";
+import { setCanonicalUserPreferences } from "../state/user-preferences.js";
 import {
   ensureProfileForEmail,
   setDisplayName,
@@ -95,6 +96,10 @@ describe("gateway presence audience", () => {
     const restricted = ensureProfileForEmail("restricted@example.com");
     setUserProfileRole(restricted.id, "restricted");
     setUserProfileRole(ensureProfileForEmail("admin@example.com").id, "maintainer");
+    // Fork: admins see others' private sessions only after opting in.
+    await setCanonicalUserPreferences(ensureProfileForEmail("admin@example.com").id, {
+      "sessions.showOthersPrivate": true,
+    });
     const watcherProfile = ensureProfileForEmail("watcher@example.com");
     setUserProfileRole(watcherProfile.id, "maintainer");
     setDisplayName(watcherProfile.id, "Presence Watcher");

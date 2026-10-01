@@ -562,12 +562,13 @@ export const sessionSuggestionHandlers: GatewayRequestHandlers = {
         client,
         isMember: (value, identity) =>
           projection.hasMembership(value.storePath, value.storeKey, identity),
+        target: () => null,
       });
     const prepared = sharing();
     if (
       !target ||
       (hasOperatorBoundary(client, projection.getPolicyConfig()) &&
-        prepared.entryFilter?.(target.storeKey, target.entry) === false)
+        prepared.entryFilter?.(target.storeKey, target.entry, target) === false)
     ) {
       respond(
         false,
@@ -585,7 +586,7 @@ export const sessionSuggestionHandlers: GatewayRequestHandlers = {
       if (
         authorizeIncognitoSessionTarget({ client, sessionKey: query.key, target: current }) ||
         (hasOperatorBoundary(client, projection.getPolicyConfig()) &&
-          access.entryFilter?.(current.storeKey, current.entry) === false)
+          access.entryFilter?.(current.storeKey, current.entry, current) === false)
       ) {
         return false;
       }

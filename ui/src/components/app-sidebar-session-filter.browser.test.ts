@@ -161,6 +161,11 @@ describe.runIf("__vitest_browser__" in globalThis)("sidebar session filter popov
       await expect
         .element(page.getByRole("switch", { name: "Show system sessions", exact: true }))
         .toHaveFocus();
+      // Fork: admins also get the others' private sessions switch.
+      await userEvent.tab();
+      await expect
+        .element(page.getByRole("switch", { name: "Show others' private sessions", exact: true }))
+        .toHaveFocus();
       await userEvent.tab();
       await expect
         .element(page.getByRole("button", { name: "Group by: Custom groups", exact: true }))

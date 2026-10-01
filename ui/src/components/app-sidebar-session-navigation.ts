@@ -4,10 +4,10 @@ import { state } from "lit/decorators.js";
 import type { SessionObserverDigest } from "../../../packages/gateway-protocol/src/schema/sessions.js";
 import type { UsersPrefsGetResult } from "../../../packages/gateway-protocol/src/schema/users.ts";
 import type { GatewaySessionRow, SessionsListResult } from "../api/types.ts";
-import { readGatewayOperatorAccess } from "../app/operator-access.ts";
-import { saveUserPreferences } from "../app/user-prefs-cache.ts";
 import { serializeSidebarEntry } from "../app-navigation.ts";
 import { isSessionRouteId } from "../app-route-paths.ts";
+import { readGatewayOperatorAccess } from "../app/operator-access.ts";
+import { saveUserPreferences } from "../app/user-prefs-cache.ts";
 import { t } from "../i18n/index.ts";
 import { shouldHandleNavigationClick } from "../lib/navigation-click.ts";
 import {

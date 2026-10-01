@@ -28,6 +28,11 @@ export async function filterMutableSessionGroupRecords<T extends { name: string 
     client: params.client,
     isMember: (target, identityId) =>
       projection.hasMembership(target.storePath, target.storeKey, identityId),
+    target: (sessionKey) =>
+      projection.sharingTarget({
+        agentId: resolveSessionStoreAgentId(projection.state.cfg, sessionKey),
+        key: sessionKey,
+      }),
   });
   const allowed = new Set(records.map((record) => record.name));
   for (const [name, targetRefs] of projection.sessionGroupTargets()) {

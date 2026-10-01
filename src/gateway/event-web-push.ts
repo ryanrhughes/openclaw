@@ -18,12 +18,14 @@ import {
 } from "../infra/push-web.js";
 import { createSubsystemLogger, type SubsystemLogger } from "../logging/subsystem.js";
 import { isTranscriptOnlyOpenClawAssistantMessage } from "../shared/transcript-only-openclaw-assistant.js";
-import { resolveUserProfileId } from "../state/user-profiles.js";
 import { resolveControlUiWebPushUrl } from "./control-ui-shared.js";
 import { QUESTIONS_SCOPE } from "./method-scopes.js";
 import { ADMIN_SCOPE, READ_SCOPE } from "./operator-scopes.js";
 import type { GatewayBroadcastOpts } from "./server-broadcast-types.js";
-import { loadSessionProfilePreferences } from "./session-profile-preferences.js";
+import {
+  hasSessionProfilePreferences,
+  loadSessionProfilePreferences,
+} from "./session-profile-preferences.js";
 import { canReceiveSessionEvent } from "./session-sharing.js";
 import {
   listCurrentWebPushTargets,
@@ -143,10 +145,10 @@ export function createEventWebPushDelivery(params: {
       const sessionKeys = opts?.sessionKeys ?? [];
       // Offline recipients never connected since restart; load their durable session
       // preferences so private-session eligibility matches their saved opt-in.
-      const mentionRecipientId = mention && resolveUserProfileId(mention.recipientProfileId);
-      if (mentionRecipientId) {
+      // The loader resolves merge heads itself, so no synchronous profile read is needed here.
+      if (mention && !hasSessionProfilePreferences(mention.recipientProfileId)) {
         // Best effort: a failed read keeps the cached eligibility rather than dropping delivery.
-        await loadSessionProfilePreferences(mentionRecipientId).catch(() => undefined);
+        await loadSessionProfilePreferences(mention.recipientProfileId).catch(() => undefined);
       }
       const groupedResults = await withCurrentWebPushAuthority(
         { ...params, sessionKeys, agentId },

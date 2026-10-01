@@ -258,12 +258,8 @@ describe("projects.list observed projects", () => {
       service,
       client: authenticatedClient("admin@example.com", ["operator.admin"]),
     })) as Array<{ name: string }>;
-    expect(admin.map((project) => project.name)).toEqual([
-      "visible",
-      "private",
-      "orphan",
-      "manual",
-    ]);
+    // Fork: admins see others' private sessions only after opting in.
+    expect(admin.map((project) => project.name)).toEqual(["visible", "orphan", "manual"]);
   });
 
   it("redacts URL and SCP-style userinfo and omits unknown remote forms", async () => {

@@ -37,6 +37,7 @@ it("refreshes retained sharing facts on profile changes and clears them when ide
         cfg: rolePolicyConfig(),
         client,
         isMember: () => false,
+        target: () => null,
       });
       expect(sharing.sessionCap).toBe("none");
       expect(sharing.isCreator({ type: "human", source: "profile", id: source.id })).toBe(true);

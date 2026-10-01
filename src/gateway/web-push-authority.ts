@@ -250,6 +250,7 @@ export function webPushSessionAccess(authority: WebPushAuthority, client: Gatewa
         [...authority.sessions.values()].some(
           (facts) => facts.target === target && facts.membership.has(identity),
         ),
+      target: (sessionKey) => authority.sessions.get(sessionKey)?.target ?? null,
     }),
     target: (sessionKey: string) => authority.sessions.get(sessionKey)?.target ?? null,
   };

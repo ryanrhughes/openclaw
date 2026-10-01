@@ -18,7 +18,12 @@ function resolveCronEntryFilter(client: GatewayClient | null, cfg: OpenClawConfi
   if (identity && getCronManagementAuthority(identity)) {
     return undefined;
   }
-  const sharing = prepareProjectedSessionSharing({ client, cfg, isMember: () => false });
+  const sharing = prepareProjectedSessionSharing({
+    client,
+    cfg,
+    isMember: () => false,
+    target: () => null,
+  });
   return sharing.sessionCap === "none" ? sharing.entryFilter : undefined;
 }
 

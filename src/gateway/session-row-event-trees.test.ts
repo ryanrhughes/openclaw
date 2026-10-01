@@ -27,6 +27,7 @@ import {
 } from "./server-methods/sessions-read-cache.test-support.js";
 import { sessionSubscriptionHandlers } from "./server-methods/sessions-subscriptions.js";
 import type { GatewayWsClient } from "./server/ws-types.js";
+import { applySessionProfilePreferenceChanges } from "./session-profile-preferences.js";
 import { getSessionRowProjection } from "./session-row-projection-access.js";
 import { rolePolicyConfig, sharingPolicyClient } from "./session-sharing.test-utils.js";
 import type { GatewaySessionRow } from "./session-utils.types.js";
@@ -372,6 +373,10 @@ it("publishes fresh ancestor rows through private intermediates with list visibi
 
       const viewer = peers[1]!;
       const viewerScopes = viewer.client.connect.scopes;
+      // Fork: admins see others' private sessions only after opting in.
+      applySessionProfilePreferenceChanges(profiles[1]!.id, {
+        "sessions.showOthersPrivate": true,
+      });
       for (const admin of [true, false, true, false]) {
         const previousParentRevision = viewer.ancestors.get(parent)?.ancestorRevision;
         viewer.client.connect.scopes = admin ? ["operator.admin"] : viewerScopes;
@@ -391,6 +396,9 @@ it("publishes fresh ancestor rows through private intermediates with list visibi
           expect(ancestors.some((row) => row.key === parent)).toBe(false);
         }
       }
+      applySessionProfilePreferenceChanges(profiles[1]!.id, {
+        "sessions.showOthersPrivate": false,
+      });
 
       const returning = peers[0]!;
       connection.clients.delete(returning.client);
