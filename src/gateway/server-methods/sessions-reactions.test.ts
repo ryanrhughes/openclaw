@@ -113,12 +113,13 @@ describe("session reaction handlers", () => {
       const cases = [
         { name: "draft owner", identity: "owner", visibility: "draft", allowed: true },
         { name: "draft admin", identity: "admin", admin: true, visibility: "draft", allowed: true },
+        // Fork: invited members participate in private (draft) sessions.
         {
           name: "draft member",
           identity: "member",
           member: true,
           visibility: "draft",
-          allowed: false,
+          allowed: true,
         },
         {
           name: "read-only member",
