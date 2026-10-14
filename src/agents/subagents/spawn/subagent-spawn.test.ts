@@ -1055,7 +1055,7 @@ describe("spawnSubagentDirect seam flow", () => {
         },
       );
       hoisted.loadSessionStoreMock.mockReturnValue({ [parentSessionKey]: parent });
-      hoisted.configOverride = createConfigOverride({
+      configOverride = createConfigOverride({
         session: { store: storePath },
         agents: {
           defaults: { sandbox: { mode: "off" } },
