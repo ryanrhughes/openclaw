@@ -98,9 +98,7 @@ async function resolveSessionUsageFileOrRespond(
   if (
     !resolved ||
     (visible &&
-      (resolved.entry
-        ? visible(resolved.canonicalKey, resolved.entry) === false
-        : !isGatewayAdmin(client)))
+      (resolved.entry ? !visible(resolved.canonicalKey, resolved.entry) : !isGatewayAdmin(client)))
   ) {
     respond(
       false,

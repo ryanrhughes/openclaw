@@ -111,7 +111,9 @@ async function resolveAuthenticatedProfile(
   // in the background. Until it does the opt-in reads as off, so private sessions stay hidden.
   await Promise.race([
     loadSessionProfilePreferences(id).catch(() => undefined),
-    new Promise((resolve) => setTimeout(resolve, SESSION_PREFERENCES_CONNECT_WAIT_MS).unref()),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, SESSION_PREFERENCES_CONNECT_WAIT_MS).unref();
+    }),
   ]);
   assertCurrent?.();
   return {

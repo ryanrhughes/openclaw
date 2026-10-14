@@ -19,8 +19,7 @@ import { prepareAgentDatabaseDeletionSnapshotRead } from "../state/agent-deletio
 import { isOpenClawAgentDatabaseRegistryChange } from "../state/openclaw-agent-db-registry-listing.js";
 import { prepareUserProfileCatalog, retainUserProfileCatalog } from "../state/user-profile-list.js";
 import { ensureSessionGroupCatalog } from "./session-group-catalog.js";
-import { createSessionMembershipProjection } from "./session-membership-projection.js";
-import { publishSessionMembershipSnapshot } from "./session-membership-snapshot.js";
+import { createPublishedSessionMembershipProjection } from "./session-membership-projection.js";
 import { createSessionProjectionDrain, yieldSessionListWork } from "./session-projection-work.js";
 import * as rowMembership from "./session-row-membership-read.js";
 import { createSessionRowPlacementProjection } from "./session-row-placement-projection.js";
@@ -56,8 +55,7 @@ export async function createSessionRowProjection(params: records.ProjectionOptio
   const getPolicyConfig = () => params.getPolicyConfig?.() ?? cfg;
   const rows = new Map<string, records.Row>();
   const creators = createSessionRowCreatorIndex();
-  const membership = createSessionMembershipProjection();
-  publishSessionMembershipSnapshot(membership);
+  const membership = createPublishedSessionMembershipProjection();
   const {
     invalidateRowMembership,
     readSessionRowEntry: readStoredSessionRowEntry,

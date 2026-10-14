@@ -8,6 +8,7 @@ import { projectionLane } from "../config/sessions/session-transcript-worker-res
 import { withSessionHistoryWorkerDatabases } from "../config/sessions/session-transcript-worker-runtime.js";
 import type { SessionRowChange } from "../sessions/session-row-changes.js";
 import { retainOpenClawAgentDatabaseReadCandidates } from "../state/openclaw-agent-db.js";
+import { publishSessionMembershipSnapshot } from "./session-membership-snapshot.js";
 
 type SessionMembershipProjectionTarget = {
   agentId: string;
@@ -403,4 +404,11 @@ export function createSessionMembershipProjection(options: { env?: NodeJS.Proces
       groups = undefined;
     },
   };
+}
+
+/** The Gateway's resident projection; sharing filters read it through the published snapshot. */
+export function createPublishedSessionMembershipProjection() {
+  const membership = createSessionMembershipProjection();
+  publishSessionMembershipSnapshot(membership);
+  return membership;
 }
