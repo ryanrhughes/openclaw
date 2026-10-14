@@ -14,6 +14,7 @@ import {
   type SessionEntry,
   type InternalSessionEntry,
 } from "../../config/sessions.js";
+import { resolveAgentMainSessionKey } from "../../config/sessions/main-session.js";
 import {
   patchSessionEntryTarget,
   type SessionEntryPatchOptions,
@@ -44,6 +45,7 @@ import type { GatewayOperatorRoleActor } from "../server-methods/shared-types.js
 import type { GatewayRequestHandlerOptions } from "../server-methods/types.js";
 import type { TrustedSessionCreation } from "../session-creation-provenance.js";
 import { createClosedSessionTranscriptSource } from "../session-end-transcript-reader.js";
+import { resolveNewSessionVisibility } from "../session-profile-preferences.js";
 import {
   emitGatewaySessionEndPluginHook,
   emitGatewaySessionStartPluginHook,
@@ -128,6 +130,24 @@ export async function persistAgentSessionPhase(params: {
   setMainRestartRecoveryOwnerLease: (lease: MainSessionRecoveryOwnerLease) => void;
   respond: GatewayRequestHandlerOptions["respond"];
 }): Promise<AgentSessionPersistResult | undefined> {
+  const delegatedCreator =
+    !params.creation.actor &&
+    params.cfg.gateway?.roles &&
+    params.operatorRoleActor?.kind === "operator"
+      ? {
+          type: "human" as const,
+          source: "profile" as const,
+          id: params.operatorRoleActor.profileId,
+        }
+      : params.creation.actor;
+  const defaultVisibility = resolveNewSessionVisibility({
+    cfg: params.cfg,
+    creator: delegatedCreator,
+    explicit: params.initialSessionEntry?.visibility,
+    isMainSession:
+      params.canonicalSessionKey ===
+      resolveAgentMainSessionKey({ cfg: params.cfg, agentId: params.sessionAgentId }),
+  });
   let patchBuild = params.initialPatchBuild;
   let sessionEntry = params.initialSessionEntry;
   let resolvedSessionId = params.initialResolvedSessionId;
@@ -363,9 +383,16 @@ export async function persistAgentSessionPhase(params: {
               ? { ...lifecyclePatch, ...rotationLineage }
               : {
                   ...lifecyclePatch,
+                  // A delegated private default stamps the same operator it was resolved
+                  // for, like a newly required sandbox, so that person keeps access.
                   ...buildSessionCreationStamp(
-                    sandbox ? { ...delegatedCreation, sandbox } : params.creation,
+                    sandbox
+                      ? { ...delegatedCreation, sandbox }
+                      : defaultVisibility === "draft" && !params.creation.actor
+                        ? delegatedCreation
+                        : params.creation,
                   ),
+                  ...(defaultVisibility ? { visibility: defaultVisibility } : {}),
                 };
             createdNewEntry = freshEntry === undefined;
             const merged = mergeSessionEntry(entryForPatch, effectivePatch);

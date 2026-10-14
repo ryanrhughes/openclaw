@@ -122,7 +122,11 @@ export async function withCurrentSessionListRows<T>(
         }
         return (
           !presentation.authorizeDescription(query) &&
-          presentation.sharing.entryFilter?.(record.key, record.entry) !== false
+          presentation.sharing.entryFilter?.(
+            record.key,
+            record.entry,
+            presentation.target(query) ?? undefined,
+          ) !== false
         );
       });
       return consume(visible);

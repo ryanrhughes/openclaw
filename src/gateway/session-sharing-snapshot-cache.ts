@@ -5,6 +5,7 @@ const SNAPSHOT_CACHE_LIMIT = 2_048;
 
 export type SessionSharingSnapshot = {
   createdActor?: SessionCreatedActor;
+  privateAccessRoot?: string;
   incognito: boolean;
   visibility: SessionVisibility;
 };

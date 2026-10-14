@@ -40,7 +40,13 @@ export function prepareCurrentSessionSharing(
   const { client, context, projection, actorId, runAuthority, isMember } = params;
   const currentCfg = context.getRuntimeConfig();
   const policyConfig = context.getCommittedRuntimeConfig?.() ?? currentCfg;
-  const sharing = prepareProjectedSessionSharing({ cfg: policyConfig, client, isMember });
+  // Callers supply prepared membership; private roots resolve from the membership snapshot.
+  const sharing = prepareProjectedSessionSharing({
+    cfg: policyConfig,
+    client,
+    isMember,
+    target: () => null,
+  });
   const preparedProfile = client?.preparedSessionProfile;
   if (runAuthority) {
     const actor = resolveGatewayOperatorRoleActor(client);

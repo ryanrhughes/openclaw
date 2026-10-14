@@ -110,8 +110,11 @@ export const sessionReadHandlers: GatewayRequestHandlers = {
       const { agentId, configured, requestedAgentId, sessionKeys } = scope;
       const restrictIncognito =
         Boolean(gatewayClientSessionCreator(client)) && !isGatewayAdmin(client);
+      // Explicit-key searches are direct reads: admins keep access to named private sessions.
       const roleVisibilityFilter = hasOperatorBoundary(client, policyConfig)
-        ? createSessionListEntryFilter({ client, cfg: policyConfig })
+        ? createSessionListEntryFilter({ client, cfg: policyConfig }, undefined, undefined, {
+            adminDirectAccess: Boolean(sessionKeys?.length),
+          })
         : undefined;
       const restrictVisibility = restrictIncognito || Boolean(roleVisibilityFilter);
       const targetDiscoveryCache: GatewaySessionStoreDiscoveryCache = new Map();
@@ -370,7 +373,9 @@ export const sessionReadHandlers: GatewayRequestHandlers = {
           }
           const current = read.describe({ key, agentId: currentAgent.agentId });
           const visibilityFilter = hasOperatorBoundary(client, policyConfig)
-            ? createSessionListEntryFilter({ client, cfg: policyConfig })
+            ? createSessionListEntryFilter({ client, cfg: policyConfig }, undefined, undefined, {
+                adminDirectAccess: true,
+              })
             : undefined;
           return current?.entry.sessionId &&
             visibilityFilter?.(current.key, current.entry) !== false
@@ -415,7 +420,9 @@ export const sessionReadHandlers: GatewayRequestHandlers = {
         sessionMutationAuthorization?.assertCurrent();
         const { cfg, policyConfig } = read.state;
         const visibilityFilter = hasOperatorBoundary(client, policyConfig)
-          ? createSessionListEntryFilter({ client, cfg: policyConfig })
+          ? createSessionListEntryFilter({ client, cfg: policyConfig }, undefined, undefined, {
+              adminDirectAccess: true,
+            })
           : undefined;
         for (const previous of buffered) {
           const agent = resolveRequestedGlobalAgentId(cfg, previous.preview.key);

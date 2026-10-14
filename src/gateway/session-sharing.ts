@@ -193,6 +193,19 @@ export function resolveSessionMutationAuthorization(params: {
         const sharing = prepareProjectedSessionSharing({
           cfg: policyConfig,
           client: params.client,
+          target: (sessionKey) => {
+            const record = projection.describe({ key: sessionKey, agentId: agent.agentId });
+            return record
+              ? {
+                  agentId: record.agentId,
+                  canonicalKey: record.key,
+                  entry: record.entry,
+                  storeKey: record.key,
+                  storeKeys: [record.key],
+                  storePath: record.storeTarget.storePath,
+                }
+              : null;
+          },
           isMember: (_target, identityId) => row?.membership.has(identityId) ?? false,
         });
         if (
@@ -224,10 +237,20 @@ export function resolveSessionMutationAuthorization(params: {
   ) => {
     const identity = sharingIdentity(params.client, resolveGatewayOperatorRoleActor(params.client));
     return authorizesRead
-      ? createSessionListEntryFilter({ cfg, client: params.client })?.(
-          target.storeKey,
-          target.entry,
-        ) === false
+      ? // Direct reads by key: admins keep access to named private sessions, and membership
+        // comes from the resident projection rather than a synchronous store read.
+        createSessionListEntryFilter(
+          { cfg, client: params.client },
+          undefined,
+          projection
+            ? {
+                sessionCap: operatorSessionCap(params.client, cfg),
+                isMember: (candidate, identityId) =>
+                  projection.hasMembership(candidate.storePath, candidate.storeKey, identityId),
+              }
+            : undefined,
+          { adminDirectAccess: true },
+        )?.(target.storeKey, target.entry, target) === false
         ? hiddenSessionNotFound(target.canonicalKey)
         : null
       : authorizeSessionSharingTarget({

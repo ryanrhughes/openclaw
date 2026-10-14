@@ -530,6 +530,7 @@ export function renderSidebarSessionSortMenuForController(controller: SidebarMen
     showCron: host.sessionsShowCron,
     showPreview: host.sessionsShowPreview,
     showSystem: host.sessionsShowSystem,
+    showOthersPrivate: host.sessionsShowOthersPrivateOption,
     emptyGroupsMode: host.sessionsEmptyGroupsMode,
     owners: host.sessionOwnershipVisibility.filters ? host.sessionOwnerOptions : [],
     ownerFilterId: host.sessionOwnerFilterActive ? host.sessionOwnerFilterId : null,
@@ -579,6 +580,10 @@ export function renderSidebarSessionSortMenuForController(controller: SidebarMen
     },
     onShowSystemChange: (show) => {
       host.sessionOrganizer.setSessionsShowSystem(show);
+    },
+    onShowOthersPrivateChange: (show) => {
+      host.setSessionsShowOthersPrivate(show);
+      controller.closePositionedMenu("sessionSort", { restoreFocus: true });
     },
     onEmptyGroupsModeChange: (mode) => {
       if (controller.sessionSortMenuPosition !== position) {

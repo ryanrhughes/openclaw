@@ -46,7 +46,7 @@ type MentionProfile = Extract<CurrentUserProfileDisplay, { kind: "resolved" }>;
 type MentionTarget = {
   agentId: string;
   sessionKey?: string;
-  entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito">;
+  entry: Pick<SessionEntry, "createdActor" | "visibility" | "incognito" | "privateAccessRoot">;
 };
 type MentionReader = { profile: MentionProfile; canRead: (target: MentionTarget) => boolean };
 
@@ -180,12 +180,10 @@ export function createHumanMentionPolicy(params: {
     if (!scopesAllowRead(scopes)) {
       return undefined;
     }
-    if (scopes.includes(ADMIN_SCOPE)) {
-      return profile;
-    }
     const entryFilter = createProfileSessionEntryFilter({
       profileId: profile.profileId,
       sessionCap: policy?.sessions.others,
+      admin: scopes.includes(ADMIN_SCOPE),
     });
     return entryFilter(target.sessionKey, target.entry) ? profile : undefined;
   }
@@ -217,6 +215,7 @@ export function createHumanMentionPolicy(params: {
           createdActor: resolved.entry.createdActor,
           visibility: resolved.entry.visibility,
           incognito: resolved.entry.incognito,
+          privateAccessRoot: resolved.entry.privateAccessRoot,
         },
       };
       if (!target || !requester.canRead(target)) {

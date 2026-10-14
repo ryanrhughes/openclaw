@@ -109,8 +109,10 @@ import {
 } from "./session-lifecycle-preparation.js";
 import { loadSessionLifecycleRuntime } from "./session-lifecycle-runtime-loader.js";
 import { resolvePluginSessionOwnershipError } from "./session-plugin-ownership.js";
+import { resolveNewSessionVisibility } from "./session-profile-preferences.js";
 import { resolveRequestedSessionAgentId } from "./session-request-agent.js";
 import { invalidSessionRequest, sessionCreationFailure } from "./session-request-error.js";
+import { resolveSessionVisibility } from "./session-sharing-policy.js";
 import { resolveGatewaySessionStoreTargetInWorker } from "./session-utils-store-worker.js";
 import type { GatewaySessionStoreTarget } from "./session-utils-store.types.js";
 import { loadGatewaySessionEntryReadOnly } from "./session-utils.js";
@@ -586,6 +588,14 @@ export async function createGatewaySession(
       parent: currentParentSessionEntry,
     });
     const target = creationTarget;
+    const effectiveVisibility = resolveNewSessionVisibility({
+      cfg: params.cfg,
+      creator: creation?.actor,
+      // Validated below by resolveSessionCreateVisibility; imports pass their own default.
+      explicit: params.visibility ?? params.defaultVisibility,
+      inheritsDraft: resolveSessionVisibility(currentParentSessionEntry ?? {}) === "draft",
+      isMainSession: target.canonicalKey === agentMainSessionKey,
+    });
     const targetRead = readSessionCreateTarget(
       params,
       target,
@@ -888,7 +898,7 @@ export async function createGatewaySession(
             ? buildSessionCreationStamp({ ...creation, sandbox: creationSandbox, incognito })
             : {}),
           ...(createdNewEntry && inheritedSpawnOwner ? { owner: inheritedSpawnOwner } : {}),
-          ...(visibility.value && createdNewEntry ? { visibility: visibility.value } : {}),
+          ...(effectiveVisibility && createdNewEntry ? { visibility: effectiveVisibility } : {}),
           ...projectPreparedSessionWorkspace(existingEntry, {
             projectId,
             pendingProjectGitUrl,

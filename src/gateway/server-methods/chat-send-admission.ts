@@ -329,6 +329,7 @@ export async function admitChatSend(
           cfg: latestSession.cfg,
           client,
           agentId,
+          sessionKey,
           getRuntimeConfig: context.getRuntimeConfig,
         });
         // Preparation only read facts; re-enter all current reservation and authority checks once.

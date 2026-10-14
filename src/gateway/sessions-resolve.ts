@@ -28,7 +28,7 @@ import { invalidSessionRequest } from "./session-request-error.js";
 import { withReadySessionRows } from "./session-row-prepared-read.js";
 import { prepareProjectedSessionPresentation } from "./session-row-presentation.js";
 import type { SessionRowProjection } from "./session-row-projection.js";
-import { authorizeIncognitoSessionTarget } from "./session-sharing-policy.js";
+import { authorizeIncognitoSessionTarget, isGatewayAdmin } from "./session-sharing-policy.js";
 import { resolveSessionStoreKey } from "./session-store-key.js";
 import { resolveGatewaySessionDisplayName } from "./session-utils-display.js";
 import { filterAndSortSessionEntries, prepareSessionRowSelection } from "./session-utils-list.js";
@@ -290,7 +290,9 @@ export function resolveSessionKeyFromResolveParams(params: {
       const { entry } = target;
       const spawnedBy = typeof p.spawnedBy === "string" && p.spawnedBy.trim().length > 0;
       if (
-        (hasOperatorBoundary(client, policyConfig) && entryFilter?.(target.key, entry) === false) ||
+        (hasOperatorBoundary(client, policyConfig) &&
+          !isGatewayAdmin(client) &&
+          entryFilter?.(target.key, entry) === false) ||
         (spawnedBy &&
           !filterAndSortSessionEntries({ ...prepare(requestedAgent.agentId) }).some(
             ([candidate]) => candidate === target.key,

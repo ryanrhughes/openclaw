@@ -56,9 +56,9 @@ const VISIBILITY_LABEL_KEYS: Record<SessionVisibility, string> = {
 
 function sharingIcon(visibility: SessionVisibility): TemplateResult {
   if (visibility === "draft") {
-    return icons.pencil;
+    return icons.lock;
   }
-  return visibility === "shared" ? icons.users : icons.lock;
+  return visibility === "shared" ? icons.users : icons.shield;
 }
 
 function renderMemberSkeletons() {

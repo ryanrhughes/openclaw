@@ -1,4 +1,5 @@
 import { afterEach } from "vitest";
+import { listSessionMembers } from "../config/sessions.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { onUserProfilesChanged } from "../state/user-profile-events.js";
 import { setUserProfileRole } from "../state/user-profile-writes.worker.js";
@@ -6,6 +7,7 @@ import { ensureProfileForEmail } from "../state/user-profiles.js";
 import { prepareGatewayRecipientProfile } from "./expected-profile.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import type { GatewayWsClient } from "./server/ws-types.js";
+import { publishSessionMembershipSnapshot } from "./session-membership-snapshot.js";
 
 const profileSubscriptions = new Set<() => void>();
 afterEach(() => {
@@ -109,4 +111,24 @@ export function roleClient(
   refresh();
   profileSubscriptions.add(onUserProfilesChanged(refresh));
   return client;
+}
+
+let databaseMembershipSnapshot: Parameters<typeof publishSessionMembershipSnapshot>[0] | undefined;
+
+/**
+ * Unit tests that add members straight to the store bypass the resident projection's
+ * publication; serve the membership snapshot from the database instead (tests only).
+ */
+export function publishDatabaseMembershipSnapshotForTest(): void {
+  const read = (sessionKey: string, storePath?: string) =>
+    listSessionMembers({
+      agentId: /^agent:([^:]+):/.exec(sessionKey)?.[1] ?? "main",
+      sessionKey,
+      ...(storePath ? { storePath } : {}),
+    }).map((member) => member.identityId);
+  databaseMembershipSnapshot = {
+    membership: (storePath, sessionKey) => read(sessionKey, storePath),
+    membershipForSessionKey: (sessionKey) => read(sessionKey),
+  };
+  publishSessionMembershipSnapshot(databaseMembershipSnapshot);
 }

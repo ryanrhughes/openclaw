@@ -25,6 +25,7 @@ export function buildDraftSubmissionCreateParams(
     capabilities: Pick<NewSessionCapabilityController, "toolOverrides">;
     permissionMode: SessionCreateParams["permissionMode"];
     visibility: NewSessionVisibility;
+    defaultVisibility?: "shared" | "private";
   },
   snapshot: DraftSubmissionSnapshot,
   options: DraftSessionCreateOverrides = {},
@@ -35,6 +36,7 @@ export function buildDraftSubmissionCreateParams(
     toolOverrides: draft.capabilities.toolOverrides,
     permissionMode: draft.permissionMode,
     visibility: options.visibility ?? draft.visibility,
+    defaultVisibility: draft.defaultVisibility,
     catalogId: snapshot.data?.catalogId,
     category: gateway.resolvedGroupCategory(),
   });

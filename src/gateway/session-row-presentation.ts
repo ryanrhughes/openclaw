@@ -39,7 +39,11 @@ type PresentationOptions = Omit<
   omitSentinelChildren?: boolean;
 };
 
-function toProjectedSessionSharingTarget(record: records.MaterializedRow): SessionSharingTarget {
+function toProjectedSessionSharingTarget(
+  record: Pick<records.EntryRow, "agentId" | "key" | "entry"> & {
+    storeTarget: Pick<records.EntryRow["storeTarget"], "storePath">;
+  },
+): SessionSharingTarget {
   return {
     agentId: record.agentId,
     canonicalKey: record.key,
@@ -137,6 +141,10 @@ export function prepareProjectedSessionPresentation(
   const sharing = prepareProjectedSessionSharing({
     cfg: policyConfig,
     client: client ?? null,
+    target: (sessionKey) => {
+      const agentId = tryResolveSessionCompatibilityOwnerAgentId(cfg, sessionKey);
+      return agentId ? target({ agentId, key: sessionKey }) : null;
+    },
     isMember: (value, identityId) =>
       projection
         .readMembership({
@@ -187,7 +195,14 @@ export function prepareProjectedSessionPresentation(
     if (!excludedChildKeys && client !== undefined) {
       let excluded: Set<string> | undefined;
       for (const { key, entry } of record.materialized.source.childLinks ?? []) {
-        if (sharing.entryFilter?.(key, entry) === false) {
+        // Build the child target from the link itself: describe() can materialize from SQLite.
+        const childTarget = toProjectedSessionSharingTarget({
+          agentId: record.agentId,
+          key,
+          entry,
+          storeTarget: record.storeTarget,
+        });
+        if (sharing.entryFilter?.(key, entry, childTarget) === false) {
           (excluded ??= new Set()).add(key);
         }
       }
@@ -202,7 +217,14 @@ export function prepareProjectedSessionPresentation(
           (client !== undefined &&
             projection
               .selectEntries({ key: sessionKey })
-              .some((child) => sharing.entryFilter?.(child.key, child.entry) === false))
+              .some(
+                (child) =>
+                  sharing.entryFilter?.(
+                    child.key,
+                    child.entry,
+                    toProjectedSessionSharingTarget(child),
+                  ) === false,
+              ))
         ) {
           (excludedSwarmKeys ??= new Set()).add(sessionKey);
         }

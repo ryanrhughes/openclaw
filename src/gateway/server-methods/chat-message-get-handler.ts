@@ -139,10 +139,12 @@ export const chatMessageGetHandlers: GatewayRequestHandlers = {
         );
         return false;
       }
-      const entryFilter = createSessionListEntryFilter({
-        client,
-        cfg: context.getCommittedRuntimeConfig?.() ?? current.cfg,
-      });
+      const entryFilter = createSessionListEntryFilter(
+        { client, cfg: context.getCommittedRuntimeConfig?.() ?? current.cfg },
+        undefined,
+        undefined,
+        { adminDirectAccess: true },
+      );
       if (entryFilter?.(current.canonicalKey, current.entry) === false) {
         respond(false, undefined, hiddenSessionNotFound(canonicalKey));
         return false;

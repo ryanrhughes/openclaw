@@ -81,6 +81,10 @@ export function createGatewayConnectionState(params: {
               sharing: prepareProjectedSessionSharing({
                 cfg: policyConfig,
                 client,
+                target: (key) => {
+                  const scope = resolveSessionEventAgentScope(cfg, key, agentId);
+                  return scope?.[1] ? projection.sharingTarget({ key, agentId: scope[1] }) : null;
+                },
                 isMember: (target, identity) =>
                   projection.hasMembership(target.storePath, target.storeKey, identity),
               }),

@@ -1,17 +1,15 @@
 import { resolveIntegerOption } from "@openclaw/normalization-core/number-coercion";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { validateSessionsDescribeParams } from "../../../packages/gateway-protocol/src/index.js";
+import type { SessionEntry } from "../../config/sessions.js";
 import { isIncognitoSessionKey } from "../../routing/session-key.js";
 import { projectOperatorModelRead } from "../operator-model-presentation.js";
 import { hasOperatorBoundary } from "../operator-role-policy.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
-import { withReadySessionRows } from "../session-row-prepared-read.js";
+import { withReadySessionRows, type SessionRowReadView } from "../session-row-prepared-read.js";
 import { prepareProjectedSessionPresentation } from "../session-row-presentation.js";
 import { requireSessionRowProjection } from "../session-row-projection-access.js";
-import {
-  authorizeIncognitoSessionTarget,
-  createSessionListEntryFilter,
-} from "../session-sharing.js";
+import { authorizeIncognitoSessionTarget, isGatewayAdmin } from "../session-sharing.js";
 import { readRecentSessionMessagesWithStatsAsync } from "../session-transcript-readers.js";
 import { createVisibleActiveSessionRunProjector } from "./session-active-runs.js";
 import { requireSessionKey } from "./sessions-shared.js";
@@ -68,7 +66,12 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
         if (
           !record ||
           (hasOperatorBoundary(client, read.state.policyConfig) &&
-            presentation.sharing.entryFilter?.(record.key, record.entry) === false)
+            !isGatewayAdmin(client ?? null) &&
+            presentation.sharing.entryFilter?.(
+              record.key,
+              record.entry,
+              presentation.target(query) ?? undefined,
+            ) === false)
         ) {
           respond(true, { session: null });
           return;
@@ -103,6 +106,23 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       const requested = requestedAgent();
       return requested.ok ? [{ key, agentId: requested.agentId }] : [];
     };
+    // Without gateway.roles, by-key reads keep stock semantics; admins keep direct access by key.
+    const hidesPrivateSession = (
+      read: SessionRowReadView,
+      record: { agentId: string; key: string; entry: SessionEntry },
+    ) => {
+      if (!hasOperatorBoundary(client, read.state.policyConfig) || isGatewayAdmin(client ?? null)) {
+        return false;
+      }
+      const presentation = prepareProjectedSessionPresentation(read, client);
+      return (
+        presentation.sharing.entryFilter?.(
+          record.key,
+          record.entry,
+          presentation.target({ agentId: record.agentId, key: record.key }) ?? undefined,
+        ) === false
+      );
+    };
     const selected = await withReadySessionRows(projection, queries, (read) => {
       sessionMutationAuthorization?.assertCurrent();
       const requested = requestedAgent();
@@ -111,11 +131,7 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
         return undefined;
       }
       const record = read.describe({ key, agentId: requested.agentId });
-      const policyConfig = read.state.policyConfig;
-      const boundaryFilter = hasOperatorBoundary(client, policyConfig)
-        ? createSessionListEntryFilter({ client, cfg: policyConfig })
-        : undefined;
-      if (!record?.entry.sessionId || boundaryFilter?.(record.key, record.entry) === false) {
+      if (!record?.entry.sessionId || hidesPrivateSession(read, record)) {
         respond(true, { messages: [] }, undefined);
         return undefined;
       }
@@ -151,17 +167,13 @@ export const sessionByKeyReadHandlers: GatewayRequestHandlers = {
       const current = requested.ok
         ? read.describe({ key, agentId: requested.agentId }, selected)
         : undefined;
-      const policyConfig = read.state.policyConfig;
-      const boundaryFilter = hasOperatorBoundary(client, policyConfig)
-        ? createSessionListEntryFilter({ client, cfg: policyConfig })
-        : undefined;
       if (
         !current ||
         current.agentId !== selected.agentId ||
         current.key !== selected.key ||
         current.storeTarget.storePath !== selected.storeTarget.storePath ||
         current.entry.sessionId !== target.sessionId ||
-        boundaryFilter?.(current.key, current.entry) === false
+        hidesPrivateSession(read, current)
       ) {
         respond(true, { messages: [] }, undefined);
         return;

@@ -77,7 +77,17 @@ export function prepareSessionEventProjection(
       const references = connection.references(client);
       const ancestorRows = ancestors?.every((ancestor) => projection.isCurrent(ancestor))
         ? ancestors.flatMap((ancestor) => {
-            if (presentation.sharing.entryFilter?.(ancestor.key, ancestor.entry) === false) {
+            if (
+              presentation.sharing.entryFilter?.(
+                ancestor.key,
+                ancestor.entry,
+                presentation.target({
+                  agentId: ancestor.agentId,
+                  key: ancestor.key,
+                  storePath: ancestor.storeTarget.storePath,
+                }) ?? undefined,
+              ) === false
+            ) {
               references.forget(ancestor.key);
               return [];
             }

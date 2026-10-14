@@ -101,8 +101,8 @@ const enNewSessionSetup = {
     incognito: "Incognito",
     incognitoDescription:
       "Keep this session for 24 hours or until the Gateway restarts, whichever comes first",
-    draft: "Draft",
-    draftDescription: "Keep this session to yourself until you publish it",
+    draft: "Private",
+    draftDescription: "Only you and people you invite can see this session",
     messagePlaceholder: "What should this session work on?",
     dictate: "Dictate",
     readingAttachment: "Reading attachment",

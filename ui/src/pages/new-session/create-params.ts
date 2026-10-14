@@ -23,6 +23,8 @@ export type DraftSessionCreateSelection = Partial<
   message: string;
   mentions?: readonly HumanMention[];
   visibility: NewSessionVisibility;
+  /** The creator's effective default; "private" makes an unchecked Private toggle explicit. */
+  defaultVisibility?: "shared" | "private";
   toolOverrides?: SessionCreateParams["toolOverrides"] | null;
 };
 
@@ -55,6 +57,7 @@ export function buildDraftSessionCreateParams(draft: {
   toolOverrides?: SessionCreateParams["toolOverrides"] | null;
   permissionMode?: SessionCreateParams["permissionMode"];
   visibility?: NewSessionVisibility;
+  defaultVisibility?: "shared" | "private";
   attachments?: SessionCreateParams["attachments"];
   projectId?: string;
   projectGitUrl?: string;
@@ -108,7 +111,11 @@ export function buildDraftSessionCreateParams(draft: {
     ...(displayName ? { displayName } : {}),
     ...(titleSource ? { titleSource } : {}),
     ...(draft.visibility === "incognito" ? { incognito: true } : {}),
-    ...(draft.visibility === "draft" ? { visibility: "draft" } : {}),
+    ...(draft.visibility === "draft"
+      ? { visibility: "draft" }
+      : draft.visibility === "normal" && draft.defaultVisibility === "private"
+        ? { visibility: "shared" }
+        : {}),
     ...(!draft.deferInitialTurn && draft.attachments?.length
       ? { attachments: draft.attachments }
       : {}),
