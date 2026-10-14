@@ -4,7 +4,11 @@ import type { PrepareSessionEventProjection } from "./server-broadcast-types.js"
 import { prepareSessionAncestor } from "./session-ancestor-references.js";
 import { buildGatewaySessionSnapshot } from "./session-event-payload.js";
 import type { SessionRowReadView } from "./session-row-prepared-read.js";
-import { prepareSessionRowPublication, serializeSessionRow } from "./session-row-presentation.js";
+import {
+  prepareSessionRowPublication,
+  serializeSessionRow,
+  toProjectedSessionSharingTarget,
+} from "./session-row-presentation.js";
 import type { SessionRowProjection } from "./session-row-projection.js";
 
 /** Bind prepared rows without exposing their implementation to transport contracts. */
@@ -81,11 +85,7 @@ export function prepareSessionEventProjection(
               presentation.sharing.entryFilter?.(
                 ancestor.key,
                 ancestor.entry,
-                presentation.target({
-                  agentId: ancestor.agentId,
-                  key: ancestor.key,
-                  storePath: ancestor.storeTarget.storePath,
-                }) ?? undefined,
+                toProjectedSessionSharingTarget(ancestor),
               ) === false
             ) {
               references.forget(ancestor.key);

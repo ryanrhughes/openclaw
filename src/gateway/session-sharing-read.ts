@@ -129,6 +129,11 @@ export function canReceiveSessionEvent(params: {
     if ((snapshot.incognito && !admin) || (hidesForeignSessions && !isCreator && !admin)) {
       return false;
     }
+    // Incognito rows have no projected sharing target; admins keep stock access to them
+    // rather than failing closed as an unknown private session.
+    if (admin && snapshot.incognito && params.prepared && !target) {
+      return true;
+    }
     if (snapshot.visibility !== "draft" || isCreator) {
       return true;
     }

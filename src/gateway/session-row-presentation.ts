@@ -39,7 +39,8 @@ type PresentationOptions = Omit<
   omitSentinelChildren?: boolean;
 };
 
-function toProjectedSessionSharingTarget(
+/** Builds a sharing target from a row already in hand; describe() can refresh from SQLite. */
+export function toProjectedSessionSharingTarget(
   record: Pick<records.EntryRow, "agentId" | "key" | "entry"> & {
     storeTarget: Pick<records.EntryRow["storeTarget"], "storePath">;
   },
