@@ -31,6 +31,7 @@ import {
 export class UsageSessionInvalidRequestError extends Error {}
 
 type ResolvedSessionUsageTarget = {
+  canonicalKey: string;
   entry: SessionEntry | undefined;
   agentId: string;
   sessionId: string;
@@ -77,7 +78,7 @@ export async function resolveSessionUsageTarget(
   });
   signal?.throwIfAborted();
   return source
-    ? { entry: source.entry, agentId, sessionId, sessionFile: source.sessionFile }
+    ? { canonicalKey, entry: source.entry, agentId, sessionId, sessionFile: source.sessionFile }
     : undefined;
 }
 

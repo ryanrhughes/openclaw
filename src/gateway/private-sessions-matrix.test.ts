@@ -115,6 +115,7 @@ test("private sessions outcome matrix", async () => {
     history: boolean;
     event: boolean;
     send: boolean;
+    usageLogs: boolean;
   };
   const rows = {} as Record<keyof typeof profiles, MatrixRow>;
   for (const profile of ["A", "B", "C", "D", "E"] as const) {
@@ -131,6 +132,12 @@ test("private sessions outcome matrix", async () => {
     );
     const history = await directSessionReq<{ messages: unknown[] }>(
       "sessions.get",
+      { key: sessionKey },
+      { client, context },
+    );
+    // Usage logs return transcript text by key, so they follow the history rule.
+    const usageLogs = await directSessionReq<{ logs: unknown[] }>(
+      "sessions.usage.logs",
       { key: sessionKey },
       { client, context },
     );
@@ -152,20 +159,38 @@ test("private sessions outcome matrix", async () => {
           requestParams: { sessionKey },
           context: createDirectChatContext({ getRuntimeConfig: () => cfg }),
         }).error === null,
+      usageLogs: (usageLogs.payload?.logs.length ?? 0) > 0,
     };
     rows[profile] = row;
     console.log(
-      `${profile} | ${row.listed ? "yes" : "no"} | ${row.describe ? "yes" : "no"} | ${row.history ? "yes" : "no"} | ${row.event ? "yes" : "no"} | ${row.send ? "yes" : "no"}`,
+      `${profile} | ${row.listed ? "yes" : "no"} | ${row.describe ? "yes" : "no"} | ${row.history ? "yes" : "no"} | ${row.event ? "yes" : "no"} | ${row.send ? "yes" : "no"} | ${row.usageLogs ? "yes" : "no"}`,
     );
   }
 
   expect(rows).toEqual({
-    A: { listed: true, describe: true, history: true, event: true, send: true },
-    B: { listed: true, describe: true, history: true, event: true, send: true },
-    C: { listed: false, describe: false, history: false, event: false, send: false },
-    D: { listed: false, describe: true, history: true, event: false, send: true },
-    E: { listed: true, describe: true, history: true, event: true, send: true },
+    A: { listed: true, describe: true, history: true, event: true, send: true, usageLogs: true },
+    B: { listed: true, describe: true, history: true, event: true, send: true, usageLogs: true },
+    C: {
+      listed: false,
+      describe: false,
+      history: false,
+      event: false,
+      send: false,
+      usageLogs: false,
+    },
+    D: { listed: false, describe: true, history: true, event: false, send: true, usageLogs: true },
+    E: { listed: true, describe: true, history: true, event: true, send: true, usageLogs: true },
   });
+  const usageListed = async (profile: keyof typeof profiles) =>
+    (
+      await directSessionReq<{ sessions: Array<{ key: string }> }>(
+        "sessions.usage",
+        { agentId: "main" },
+        { client: profiles[profile], context },
+      )
+    ).payload?.sessions.some((session) => session.key === sessionKey) ?? false;
+  expect(await usageListed("B"), "usage listed B").toBe(true);
+  expect(await usageListed("C"), "usage listed C").toBe(false);
 
   const page = await directSessionReq<{ sessions: Array<{ key: string }> }>(
     "sessions.list",
