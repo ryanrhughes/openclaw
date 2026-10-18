@@ -157,6 +157,8 @@ export type EmbeddedRunAttemptParams = EmbeddedRunAttemptBase & {
   sandbox?: SandboxContext | null;
   /** Host-created authority available only after harness selection. */
   hostCapabilities?: import("../../harness/host-capability-types.js").AgentHarnessHostCapabilities;
+  /** Host-issued per-requester MCP principal for a senderless, verified profile turn. */
+  mcpRequesterPrincipal?: import("../../agent-bundle-mcp-types.js").McpRequesterPrincipal;
   /** Sticky operation identity used to suppress ordinary retry and hook policy. */
   operation?: EmbeddedRunAttemptOperation;
   /** Core-prepared fact that explicit requester/config policy restricts plugin-native tools. */

@@ -3,6 +3,7 @@ import type { SessionToolOverrides } from "../config/sessions/types.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { PluginManifestRegistry } from "../plugins/manifest-registry.js";
 import type {
+  McpRequesterPrincipal,
   RequesterMcpConnect,
   SessionMcpRequesterScope,
   SessionMcpRuntime,
@@ -25,8 +26,9 @@ export function resolveSessionMcpRuntimeIdleTtlMs(cfg?: OpenClawConfig): number 
 export function shouldLoadRequesterScopedMcpHarnessRuntime(params: {
   sessionId: string;
   requesterSenderId?: string | null;
+  requesterPrincipal?: McpRequesterPrincipal;
 }): boolean {
-  if (params.requesterSenderId?.trim()) {
+  if (params.requesterSenderId?.trim() || params.requesterPrincipal) {
     return true;
   }
   const manager = (globalThis as Record<PropertyKey, unknown>)[SESSION_MCP_RUNTIME_MANAGER_KEY] as

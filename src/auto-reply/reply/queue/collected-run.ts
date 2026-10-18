@@ -18,6 +18,7 @@ export function resolveCollectedRun(items: readonly FollowupRun[], source: Follo
   return {
     ...source,
     senderId: undefined,
+    turnRequesterProfileId: undefined,
     senderName: undefined,
     senderUsername: undefined,
     senderE164: undefined,

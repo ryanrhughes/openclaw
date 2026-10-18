@@ -135,6 +135,8 @@ export async function prepareEmbeddedAttemptBundleTools(params: {
         // or the triggering run's sender on follow-ups). Cron/subagent/heartbeat runs
         // leave it unset, so requester-scoped MCP stays fail-closed for those paths.
         requesterSenderId: params.attempt.senderId,
+        // A senderless Control UI turn's verified profile; those runs have none either.
+        requesterPrincipal: params.attempt.mcpRequesterPrincipal,
         agentAccountId: params.attempt.agentAccountId,
         messageChannel: params.attempt.messageChannel ?? params.attempt.messageProvider,
       })
@@ -142,6 +144,7 @@ export async function prepareEmbeddedAttemptBundleTools(params: {
   const bundleMcpRuntime = bundleMcpAcquisition
     ? await materializeBundleMcpToolsForRun({
         ...bundleMcpAcquisition,
+        requesterPrincipal: params.attempt.mcpRequesterPrincipal,
         agentId: params.setup.sessionAgentId,
         reservedToolNames: [
           ...tools.map((tool) => tool.name),

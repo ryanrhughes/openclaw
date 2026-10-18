@@ -478,6 +478,7 @@ export async function prepareCodexAttemptTools(runtime: CodexAttemptRuntime) {
             requestInteractiveCodexApproval: (approval) =>
               requestInteractiveMcpApproval(approval, ["allow-once", "deny"]),
             requesterSenderId: params.senderId,
+            requesterPrincipal: params.mcpRequesterPrincipal,
             agentAccountId: params.agentAccountId,
             messageChannel: params.messageChannel ?? params.messageProvider,
             reservedToolNames: [

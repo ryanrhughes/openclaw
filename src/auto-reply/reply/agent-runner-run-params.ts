@@ -154,6 +154,7 @@ export async function buildEmbeddedRunBaseParams(params: {
     scheduledToolPolicy: params.run.scheduledToolPolicy,
     runtimePluginToolGrant: params.run.runtimePluginToolGrant,
     senderIsOwner: params.run.senderIsOwner,
+    turnRequesterProfileId: params.run.turnRequesterProfileId,
     conversationToolPolicy: params.run.conversationToolPolicy,
     channelContext: params.run.channelContext,
     approvalReviewerDeviceId: params.run.approvalReviewerDeviceId,

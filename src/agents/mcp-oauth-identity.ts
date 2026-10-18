@@ -29,13 +29,23 @@ export function requesterMcpOAuthIdentity(
   const operator = operatorMcpOAuthIdentity(serverName, serverUrl);
   // The requester tuple intentionally excludes session identity. Changing this
   // grammar would either leak credentials across principals or strand stored rows.
-  const requesterHash = createHash("sha256")
-    .update(scope.messageChannel ?? "")
-    .update("\0")
-    .update(scope.agentAccountId ?? "")
-    .update("\0")
-    .update(scope.requesterSenderId)
-    .digest("hex");
+  const hash = createHash("sha256");
+  if (scope.requesterKind === "gateway-profile") {
+    // Exactly one NUL; every sender tuple below has at least two, so a profile can
+    // never share a sender's preimage, whatever channel/account/sender it claims.
+    if (scope.requesterSenderId.includes("\0")) {
+      throw new Error("Gateway profile ids cannot contain NUL");
+    }
+    hash.update("gateway-profile").update("\0").update(scope.requesterSenderId);
+  } else {
+    hash
+      .update(scope.messageChannel ?? "")
+      .update("\0")
+      .update(scope.agentAccountId ?? "")
+      .update("\0")
+      .update(scope.requesterSenderId);
+  }
+  const requesterHash = hash.digest("hex");
   return {
     ...operator,
     storeKey: `${operator.storeKey}-r-${requesterHash.slice(0, 16)}`,

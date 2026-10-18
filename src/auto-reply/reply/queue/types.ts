@@ -223,6 +223,8 @@ export type FollowupRun = {
     /** Parent session provenance used to validate inherited group policy. */
     spawnedBy?: string;
     senderId?: string;
+    /** Verified requester profile of a senderless turn; selects nothing without live authority. */
+    turnRequesterProfileId?: string;
     channelContext?: PluginHookChannelContext;
     senderName?: string;
     senderUsername?: string;

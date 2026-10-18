@@ -101,6 +101,12 @@ export type AgentRunChannelContext = {
   /** Channel-specific identity metadata surfaced to plugin hooks. */
   channelContext?: PluginHookChannelContext;
   senderId?: string | null;
+  /**
+   * Verified Gateway profile that sent this turn without a channel sender. Grants
+   * nothing alone: per-requester MCP uses it only while it matches the run's live
+   * operator authority.
+   */
+  turnRequesterProfileId?: string;
   senderName?: string | null;
   senderUsername?: string | null;
   senderE164?: string | null;

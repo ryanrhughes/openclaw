@@ -68,6 +68,7 @@ export function resolveFollowupAuthorizationKey(run: FollowupRun): string {
   return JSON.stringify([
     resolveReplyOperatorAuthorityKey(run.operatorAuthority),
     execution.senderId ?? "",
+    execution.turnRequesterProfileId ?? "",
     JSON.stringify(execution.channelContext ?? null),
     stableStringify(execution.conversationToolPolicy ?? null),
     execution.senderE164 ?? "",

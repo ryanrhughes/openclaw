@@ -307,6 +307,7 @@ export function buildMcpRequesterRuntimeCacheKey(params: {
   messageChannel?: string | null;
   agentAccountId?: string | null;
   requesterSenderId: string;
+  requesterKind?: "gateway-profile";
 }): string {
   // Composite key for requester-scoped runtimes. Static runtimes keep bare sessionId.
   return JSON.stringify({
@@ -314,5 +315,7 @@ export function buildMcpRequesterRuntimeCacheKey(params: {
     messageChannel: normalizeOptionalString(params.messageChannel) ?? "",
     agentAccountId: normalizeOptionalString(params.agentAccountId) ?? "",
     requesterSenderId: params.requesterSenderId,
+    // A profile never shares a runtime with an equal-looking channel sender id.
+    ...(params.requesterKind ? { requesterKind: params.requesterKind } : {}),
   });
 }
