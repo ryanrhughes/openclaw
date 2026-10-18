@@ -126,10 +126,24 @@ export type McpRequestOptions = {
 
 /** Trusted requester identity used to scope per-user MCP connections. */
 export type SessionMcpRequesterScope = {
+  /** Channel sender id, or the profile id when requesterKind is "gateway-profile". */
   requesterSenderId: string;
   agentAccountId?: string;
   messageChannel?: string;
+  /** Absent for channel senders, whose credential keys predate profile principals. */
+  requesterKind?: "gateway-profile";
 };
+
+/**
+ * Host-issued per-requester MCP principal for a verified Gateway profile acting
+ * without a channel sender, such as a signed-in Control UI user. assertCurrent
+ * rechecks the run's live operator authority and sole turn participant.
+ */
+export type McpRequesterPrincipal = Readonly<{
+  kind: "gateway-profile";
+  profileId: string;
+  assertCurrent: () => void;
+}>;
 
 /** Supplied only by the authenticated Gateway profile owner, never inferred from a channel sender. */
 export type McpAppRequesterIdentity = { kind: "gateway-profile"; profileId: string };
@@ -220,6 +234,8 @@ export type SessionMcpRuntimeManager = {
     manifestRegistry?: Pick<PluginManifestRegistry, "plugins">;
     /** Trusted sender id; required to materialize requester-scoped MCP servers. */
     requesterSenderId?: string | null;
+    /** Used only without requesterSenderId; lookalikes not issued by the host are ignored. */
+    requesterPrincipal?: McpRequesterPrincipal;
     agentAccountId?: string | null;
     messageChannel?: string | null;
     toolOverrides?: Pick<SessionToolOverrides, "mcpServers" | "mcpToolsDeny">;

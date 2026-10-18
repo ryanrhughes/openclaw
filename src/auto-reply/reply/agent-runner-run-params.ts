@@ -150,6 +150,7 @@ export function buildReplyRunStateParams(run: FollowupRun["run"]) {
     ownerNumbers: run.ownerNumbers,
     inputProvenance: run.inputProvenance,
     senderIsOwner: run.senderIsOwner,
+    turnRequesterProfileId: run.turnRequesterProfileId,
     conversationToolPolicy: run.conversationToolPolicy,
     channelContext: run.channelContext,
     approvalReviewerDeviceId: run.approvalReviewerDeviceId,

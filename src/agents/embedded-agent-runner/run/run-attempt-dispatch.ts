@@ -11,6 +11,7 @@ import { resolveAdmittedRunActiveAssertion } from "../../admitted-run-context.js
 import { createAgentHarnessCompletionScope } from "../../agent-harness-completion-scope.js";
 import { resolveDelegationCapability } from "../../delegation-capability.js";
 import { agentHarnessBuildsOpenClawTools } from "../../harness/tool-surface.js";
+import { resolveMcpRequesterPrincipal } from "../../mcp-requester-principal.js";
 import { applyAuthHeaderOverride, applyLocalNoAuthHeaderOverride } from "../../model-auth.js";
 import { recordAdmittedModelRoutingDecision } from "../../model-routing-decision.js";
 import { captureAgentPluginRuntimeRefresh } from "../../plugin-runtime-refresh.js";
@@ -431,6 +432,13 @@ export async function prepareAndDispatchEmbeddedRunAttempt(
     spawnedBy: params.spawnedBy,
     isCanonicalWorkspace,
     ...projectEmbeddedMessageContext(params),
+    mcpRequesterPrincipal: resolveMcpRequesterPrincipal({
+      senderId: params.senderId,
+      turnRequesterProfileId: params.turnRequesterProfileId,
+      admittedRunContext,
+      assertRunActive: assertActiveRun,
+      readTurnParticipants: () => params.replyOperation?.personalToolParticipants,
+    }),
     hasRepliedRef: params.hasRepliedRef,
     sessionFile,
     ...(sessionManager ? { sessionManager } : { sessionTarget: resolvedSessionTarget }),

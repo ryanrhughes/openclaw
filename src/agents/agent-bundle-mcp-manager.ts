@@ -15,6 +15,7 @@ import {
   type CreateSessionMcpRuntime,
 } from "./agent-bundle-mcp-runtime-shared.js";
 import type {
+  McpRequesterPrincipal,
   SessionMcpRuntime,
   SessionMcpRuntimeLease,
   SessionMcpRuntimeManager,
@@ -24,11 +25,15 @@ import {
   buildMcpRequesterRuntimeCacheKey,
   partitionMcpServersByConnectionScope,
 } from "./mcp-connection-resolver.js";
+import {
+  isMcpRequesterPrincipalCurrent,
+  readMcpRequesterPrincipal,
+} from "./mcp-requester-principal.js";
 import { resetMcpStartupBackoff } from "./mcp-startup-backoff.js";
 
 type RuntimeAcquisitionParams = Parameters<SessionMcpRuntimeManager["acquire"]>[0];
 type PreparedAcquisitionParams = RuntimeAcquisitionParams & {
-  requester?: { runtimeKey: string; senderId: string };
+  requester?: { runtimeKey: string; senderId: string; principal?: McpRequesterPrincipal };
 };
 
 const sessionMcpRuntimeLoader = createLazyImportLoader(
@@ -67,13 +72,20 @@ export function createSessionMcpRuntimeManager(opts: SessionMcpRuntimeManagerOpt
     acquire: (params: PreparedAcquisitionParams) => Promise<T>,
   ) =>
     async function current(params: RuntimeAcquisitionParams): Promise<T> {
-      const senderId = normalizeOptionalString(params.requesterSenderId);
+      const channelSenderId = normalizeOptionalString(params.requesterSenderId);
+      const issued = channelSenderId
+        ? undefined
+        : readMcpRequesterPrincipal(params.requesterPrincipal);
+      const principal = isMcpRequesterPrincipalCurrent(issued) ? issued : undefined;
+      const senderId = channelSenderId ?? principal?.profileId;
       const requester = senderId
         ? {
             senderId,
+            principal,
             runtimeKey: buildMcpRequesterRuntimeCacheKey({
               ...params,
               requesterSenderId: senderId,
+              requesterKind: principal?.kind,
             }),
           }
         : undefined;
@@ -104,6 +116,12 @@ export function createSessionMcpRuntimeManager(opts: SessionMcpRuntimeManagerOpt
             // Keep one hidden lease until its successor owns unchanged transports.
             previous?.releaseLease();
             store.scheduler.signal.throwIfAborted();
+            // Preparation awaited credential reads. A principal that went stale loses
+            // only its requester partition; shared servers stay available to the turn.
+            if (input.requester?.principal && !isMcpRequesterPrincipalCurrent(principal)) {
+              input.requester = undefined;
+              continue;
+            }
             if (!store.configReload || store.configReload === publication) {
               return acquired;
             }
@@ -145,6 +163,7 @@ export function createSessionMcpRuntimeManager(opts: SessionMcpRuntimeManagerOpt
               scopedNameSet: new Set(partition.requesterScopedServerNames),
               safeServerNamesByServer,
               requesterSenderId: requester.senderId,
+              requesterKind: requester.principal?.kind,
               runtimeKey: requester.runtimeKey,
             })
           : undefined,
@@ -159,30 +178,38 @@ export function createSessionMcpRuntimeManager(opts: SessionMcpRuntimeManagerOpt
       scopedNameSet: ReadonlySet<string>;
       safeServerNamesByServer: ReadonlyMap<string, string>;
       requesterSenderId: string;
+      requesterKind?: McpRequesterPrincipal["kind"];
       runtimeKey: string;
     },
   ) => {
     const oauthRequesterNameSet = new Set(params.oauthRequesterServerNames);
-    const resolverRequesterNameSet = new Set(params.resolverRequesterServerNames);
+    // Plugin connection resolvers are contracted to receive channel senders only.
+    const resolverRequesterServerNames = params.requesterKind
+      ? []
+      : params.resolverRequesterServerNames;
+    const resolverRequesterNameSet = new Set(resolverRequesterServerNames);
     const agentAccountId = normalizeOptionalString(params.agentAccountId);
     const messageChannel = normalizeOptionalString(params.messageChannel);
     const fullScopedFingerprint = loadSessionMcpConfig({
       ...params,
       logDiagnostics: false,
-      includeServerNames: params.scopedNameSet,
+      includeServerNames: params.requesterKind ? oauthRequesterNameSet : params.scopedNameSet,
       redactConnectionServerNames: resolverRequesterNameSet,
     }).fingerprint;
     const runtime = await install.resolveAndInstallRequesterRuntime({
       ...params,
+      resolverRequesterServerNames,
       fullScopedFingerprint,
       oauthRequesterNameSet,
       agentAccountId,
       messageChannel,
-      requesterScope: {
-        requesterSenderId: params.requesterSenderId,
-        ...(agentAccountId ? { agentAccountId } : {}),
-        ...(messageChannel ? { messageChannel } : {}),
-      },
+      requesterScope: params.requesterKind
+        ? { requesterSenderId: params.requesterSenderId, requesterKind: params.requesterKind }
+        : {
+            requesterSenderId: params.requesterSenderId,
+            ...(agentAccountId ? { agentAccountId } : {}),
+            ...(messageChannel ? { messageChannel } : {}),
+          },
     });
     return runtime ? leaseRuntime(runtime, params.runtimeKey) : undefined;
   };

@@ -129,9 +129,11 @@ The per-requester flow is sender-driven:
 2. OpenClaw returns a sign-in link for that sender instead of exposing another sender's credentials.
 3. The provider redirects through the Gateway callback. After the callback succeeds, the sender retries the tool call with their connected account.
 
+In channels, the requester is the channel sender. In the Control UI, with the built-in and Codex runtimes, the requester is the signed-in Gateway profile that sent the message; each profile connects its own account, kept separate from channel senders even when the IDs match. Everyone who signs in with the shared Gateway token is the same owner profile and shares one account. Plugin connection resolvers still receive channel senders only. Runs that no person sent (cron, heartbeats, and subagents) get no requester account. If someone else steers a running Control UI turn, that turn's per-requester tools stop working; the next message works normally.
+
 If `gateway.publicOrigin` is missing, the sign-in result names that setting and `openclaw doctor` reports the same operator fix. `openclaw mcp login` and `openclaw mcp logout` remain operator-only commands for shared credentials; they do not manage per-requester accounts.
 
-Sign-in links are single-use bearer links: any chat participant who opens one connects their own account to the sender the link was issued for. Use per-requester OAuth in channels where every trusted sender is mutually trusted; a requester-private sign-in handoff is tracked as follow-up work.
+Sign-in links are single-use bearer links: any chat participant who opens one connects their own account to the sender the link was issued for. Use per-requester OAuth in channels and shared Control UI sessions where every trusted participant is mutually trusted, and ask for sign-in in a private session; a requester-private sign-in handoff is tracked as follow-up work.
 
 The shared operator flow uses the following commands:
 

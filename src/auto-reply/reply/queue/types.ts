@@ -212,6 +212,7 @@ export type FollowupRun = {
     | "memberRoleIds"
     | "channelContext"
     | "senderIsOwner"
+    | "turnRequesterProfileId"
     | "approvalReviewerDeviceId"
     | "workspaceDir"
     | "cwd"

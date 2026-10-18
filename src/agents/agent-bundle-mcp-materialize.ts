@@ -25,6 +25,7 @@ import type {
   BundleMcpToolRuntime,
   McpCatalogTool,
   McpAppRequesterIdentity,
+  McpRequesterPrincipal,
   McpToolCatalog,
   SessionMcpRuntime,
 } from "./agent-bundle-mcp-types.js";
@@ -40,6 +41,7 @@ import {
 } from "./mcp-content.js";
 import { prepareMcpAppFormUpload } from "./mcp-form-resource-upload.js";
 import { captureMcpFormRequester, createMcpFormToolPreparer } from "./mcp-form-tool-approval.js";
+import { guardMcpRequesterTools } from "./mcp-requester-principal.js";
 import { isMcpToolAllowed } from "./mcp-tool-filter.js";
 import {
   buildMcpAppCanvasPayload,
@@ -384,6 +386,8 @@ export async function materializeBundleMcpToolsForRun(params: {
   runtime: SessionMcpRuntime;
   agentId?: string;
   appRequester?: McpAppRequesterIdentity;
+  /** Revalidated around this run's requester-scoped sign-in and MCP calls. */
+  requesterPrincipal?: McpRequesterPrincipal;
   reservedToolNames?: Iterable<string>;
   /** Transfer the lease admitted by the manager before returning this runtime. */
   releaseLease?: () => void;
@@ -600,6 +604,9 @@ export async function materializeBundleMcpToolsForRun(params: {
             })
         : undefined,
     });
+    guardMcpRequesterTools(tools, params.requesterPrincipal, (serverName) =>
+      Boolean(runtime.isRequesterScopedServer?.(serverName)),
+    );
     const appTools = buildAppToolPolicyProjections({
       catalog: materializedCatalog,
       modelTools: tools,

@@ -14,7 +14,7 @@ import {
   materializeBundleMcpToolsForRun,
 } from "./agent-bundle-mcp-materialize.js";
 import { mergeMcpConnectCatalog } from "./agent-bundle-mcp-requester-connect.js";
-import type { McpToolCatalog } from "./agent-bundle-mcp-types.js";
+import type { McpRequesterPrincipal, McpToolCatalog } from "./agent-bundle-mcp-types.js";
 import type { CodexMcpServersConfig } from "./codex-mcp-config.types.js";
 import {
   resolveConversationCapabilityProfile,
@@ -28,6 +28,7 @@ import {
   requiresMcpCodexToolApproval,
   resolveProjectedMcpCodexToolApprovalMode,
 } from "./mcp-codex-tool-approval.js";
+import { guardMcpRequesterTools } from "./mcp-requester-principal.js";
 import type { ToolPolicyFilterEvent } from "./tool-policy-pipeline.js";
 import type { AnyAgentTool } from "./tools/common.js";
 
@@ -161,6 +162,8 @@ type MaterializeRequesterScopedMcpToolsForHarnessRunParams = {
   manifestRegistry?: Pick<PluginManifestRegistry, "plugins">;
   toolOverrides?: Pick<SessionToolOverrides, "mcpServers" | "mcpToolsDeny">;
   requesterSenderId?: string | null;
+  /** Host-issued attempt principal (`mcpRequesterPrincipal`); used only without a sender. */
+  requesterPrincipal?: McpRequesterPrincipal;
   agentAccountId?: string | null;
   messageChannel?: string | null;
   reservedToolNames?: Iterable<string>;
@@ -366,11 +369,16 @@ export async function materializeRequesterScopedMcpToolsForHarnessRunCore(
     manifestRegistry: params.manifestRegistry,
     toolOverrides: params.toolOverrides,
     requesterSenderId: params.requesterSenderId,
+    requesterPrincipal: params.requesterPrincipal,
     agentAccountId: params.agentAccountId,
     messageChannel: params.messageChannel,
     toolDenylist: policyParams.conversationCapabilityProfile?.policy.explicitToolDenylist,
   });
   const scopedRuntime = scopedRuntimeHandle?.runtime;
+  // The manager admitted this principal only if it was host-issued; recheck that one.
+  const requesterPrincipal = scopedRuntime?.requesterScope?.requesterKind
+    ? params.requesterPrincipal
+    : undefined;
 
   let liveRuntime: Awaited<ReturnType<typeof materializeBundleMcpToolsForRun>> | undefined;
   let liveCatalog: McpToolCatalog | undefined;
@@ -380,6 +388,7 @@ export async function materializeRequesterScopedMcpToolsForHarnessRunCore(
         runtime: scopedRuntime,
         releaseLease: scopedRuntimeHandle?.releaseLease,
         agentId: params.agentId,
+        requesterPrincipal,
         reservedToolNames: params.reservedToolNames,
       });
       liveCatalog = scopedRuntime.peekCatalog() ?? (await scopedRuntime.getCatalog());
@@ -409,6 +418,8 @@ export async function materializeRequesterScopedMcpToolsForHarnessRunCore(
         requesterConnect?.createExecute(tool.serverName) ??
         (async () => notConnectedToolResult(tool.serverName, tool.toolName)),
     });
+    // Every advertised tool belongs to a requester-scoped server.
+    guardMcpRequesterTools(advertisedTools, requesterPrincipal, () => true);
     const liveByName = new Map((liveRuntime?.tools ?? []).map((tool) => [tool.name, tool]));
     // Live tools supply execution; advertised catalog supplies the stable name/schema surface.
     const tools = advertisedTools.map((tool) => liveByName.get(tool.name) ?? tool);
