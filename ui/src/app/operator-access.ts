@@ -93,7 +93,13 @@ export function canReactToSession(
   }
   const visibility = session.visibility ?? "shared";
   if (visibility === "draft") {
-    return role === "owner" || role === "admin";
+    // Fork: invited members participate in private sessions within their role cap,
+    // matching the gateway's authorizeSessionSharingTarget.
+    return (
+      role === "owner" ||
+      role === "admin" ||
+      (role === "member" && (cap === undefined || cap === "write"))
+    );
   }
   if (role !== "viewer") {
     return true;

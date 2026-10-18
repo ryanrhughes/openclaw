@@ -187,6 +187,7 @@ export async function admitChatSend(params: ChatSendAdmissionParams) {
         cfg: session.cfg,
         client,
         agentId,
+        sessionKey,
         getRuntimeConfig: context.getRuntimeConfig,
       });
     }

@@ -95,6 +95,8 @@ export function prepareFactsRead(
   const sharing = prepareProjectedSessionSharing({
     cfg: policyConfig,
     client: resolved.client,
+    // Facts skip drafts, so membership never needs a key-only target lookup.
+    target: () => null,
     isMember: (target, identityId) =>
       read
         .readMembership({

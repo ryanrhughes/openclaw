@@ -24,6 +24,7 @@ import { makeContextParams } from "./server-request-context.test-support.js";
 import { buildGatewaySnapshot } from "./server/health-state.js";
 import type { GatewayWsClient } from "./server/ws-types.js";
 import { prepareSessionEventProjection } from "./session-event-projection.js";
+import { applySessionProfilePreferenceChanges } from "./session-profile-preferences.js";
 import { createSessionRowProjection } from "./session-row-projection.js";
 
 type ConnectionIdReads = { count: number };
@@ -527,6 +528,8 @@ describe("gateway connection state", () => {
       const cfg: OpenClawConfig = { agents: { entries: { main: {} } } };
       setRuntimeConfigSnapshot(cfg);
       const reader = ensureProfileForEmail("presence-reader@example.test");
+      // Fork: admins see others' private sessions only after opting in.
+      applySessionProfilePreferenceChanges(reader.id, { "sessions.showOthersPrivate": true });
       const sharedKey = "agent:main:presence-shared";
       const draftKey = "agent:main:presence-draft";
       const incognitoKey = "agent:main:dashboard:incognito-presence";

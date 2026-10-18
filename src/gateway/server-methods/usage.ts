@@ -27,7 +27,7 @@ import {
   sessionDeliveryChannel,
   sessionDeliveryOrigin,
 } from "../../utils/delivery-context.read.js";
-import { operatorSessionCap } from "../operator-role-policy.js";
+import { hasOperatorBoundary, operatorSessionCap } from "../operator-role-policy.js";
 import { projectSessionActor } from "../session-identity-projection.js";
 import { resolveRequestedSessionAgentId } from "../session-request-agent.js";
 import {
@@ -41,7 +41,7 @@ import {
 import { createSessionListEntryFilter, isGatewayAdmin } from "../session-sharing.js";
 import { gatewayClientSessionCreator } from "./gateway-client-identity.js";
 import { loadUsageStatusStaleWhileRevalidate } from "./models-auth-status-usage-cache.js";
-import type { GatewayRequestHandlers, RespondFn } from "./types.js";
+import type { GatewayClient, GatewayRequestHandlers, RespondFn } from "./types.js";
 import {
   formatDateLabel,
   resolveDateInterpretation,
@@ -67,6 +67,7 @@ async function resolveSessionUsageFileOrRespond(
   detail: "timeseries" | "logs",
   respond: RespondFn,
   config: OpenClawConfig,
+  client: GatewayClient | null,
 ) {
   const key = normalizeOptionalString(params?.key);
   if (!key) {
@@ -93,7 +94,19 @@ async function resolveSessionUsageFileOrRespond(
     getAsyncWorkSignal()?.throwIfAborted();
     resolved = undefined;
   }
-  if (!resolved) {
+  // Fork: by-key usage returns transcript text, so it follows sessions.get's private-session
+  // rule: creators, members, and admins (direct access by key) only. Transcripts without a
+  // session row have no creator to authorize, so only admins can read them.
+  const visible = hasOperatorBoundary(client, config)
+    ? createSessionListEntryFilter({ client, cfg: config }, undefined, undefined, {
+        adminDirectAccess: true,
+      })
+    : undefined;
+  if (
+    !resolved ||
+    (visible &&
+      (resolved.entry ? !visible(resolved.canonicalKey, resolved.entry) : !isGatewayAdmin(client)))
+  ) {
     respond(
       false,
       undefined,
@@ -247,8 +260,11 @@ export const usageHandlers: GatewayRequestHandlers = {
     const { interpretation: dateInterpretation, range } = dateRange;
     const config = context.getRuntimeConfig();
     const sessionCap = operatorSessionCap(client ?? null, config);
+    // Fork: private sessions stay out of usage for anyone but their creator, members, and
+    // admins; stock only filtered the "none" cap.
     const visibilityFilter =
-      sessionCap === "none"
+      sessionCap === "none" ||
+      (hasOperatorBoundary(client ?? null, config) && !isGatewayAdmin(client ?? null))
         ? createSessionListEntryFilter({ client: client ?? null, cfg: config })
         : undefined;
     const profileId = gatewayClientSessionCreator(client ?? null)?.id;
@@ -437,6 +453,7 @@ export const usageHandlers: GatewayRequestHandlers = {
         client: client ?? null,
         profiles,
         isMember: () => false,
+        target: () => null,
       });
       const sessions = result.sessions.map((session) => {
         if (!session.hasContextWeight) {
@@ -469,12 +486,13 @@ export const usageHandlers: GatewayRequestHandlers = {
       }
     }
   },
-  "sessions.usage.timeseries": async ({ respond, params, context }) => {
+  "sessions.usage.timeseries": async ({ respond, params, context, client }) => {
     const resolved = await resolveSessionUsageFileOrRespond(
       params,
       "timeseries",
       respond,
       context.getRuntimeConfig(),
+      client ?? null,
     );
     if (!resolved) {
       return;
@@ -495,7 +513,7 @@ export const usageHandlers: GatewayRequestHandlers = {
 
     respond(true, timeseries, undefined);
   },
-  "sessions.usage.logs": async ({ respond, params, context }) => {
+  "sessions.usage.logs": async ({ respond, params, context, client }) => {
     const limit =
       typeof params?.limit === "number" && Number.isFinite(params.limit)
         ? Math.min(params.limit, 1000)
@@ -506,6 +524,7 @@ export const usageHandlers: GatewayRequestHandlers = {
       "logs",
       respond,
       context.getRuntimeConfig(),
+      client ?? null,
     );
     if (!resolved) {
       return;

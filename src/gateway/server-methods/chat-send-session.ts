@@ -23,6 +23,7 @@ import { resolveEffectiveAgentRuntime } from "../../agents/thinking-runtime.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { resolveTextCommand } from "../../auto-reply/commands-registry.js";
 import {
+  resolveAgentMainSessionKey,
   resolveSessionRoutingContract,
   SESSION_ROUTING_CHANGED_ERROR_REASON,
 } from "../../config/sessions/main-session.js";
@@ -42,6 +43,7 @@ import { authorizeGatewaySessionCreation, resolveCreatorSandbox } from "../opera
 import { hasGatewayAdminScope } from "../operator-scopes.js";
 import { pendingChatSendDedupeKey } from "../server-shared.js";
 import { resolveOperatorSessionCreation } from "../session-creation-provenance.js";
+import { resolveNewSessionVisibility } from "../session-profile-preferences.js";
 import {
   resolveChatSendSessionKey,
   resolveRequestedSessionAgentId,
@@ -158,6 +160,7 @@ export async function prepareChatSendSessionEntry(params: {
   cfg: OpenClawConfig;
   client: GatewayRequestHandlerOptions["client"];
   agentId: string;
+  sessionKey: string;
   getRuntimeConfig: () => OpenClawConfig;
 }): Promise<{ entry: SessionEntry; assertSkillSelection: () => void }> {
   const { cfg, client, agentId, getRuntimeConfig } = params;
@@ -173,6 +176,12 @@ export async function prepareChatSendSessionEntry(params: {
   const assertSkillSelection = () =>
     assertPreparedSkillLibrarySelection(creation.skillLibrarySelections);
   const createdAt = Date.now();
+  const visibility = resolveNewSessionVisibility({
+    cfg,
+    creator: creation.actor,
+    isMainSession:
+      params.sessionKey === resolveAgentMainSessionKey({ cfg, agentId: params.agentId }),
+  });
   // A caller's retry ID must never revive a retained transcript window.
   const sessionId = randomUUID();
   return {
@@ -188,6 +197,7 @@ export async function prepareChatSendSessionEntry(params: {
       sessionStartedAt: createdAt,
       lastInteractionAt: createdAt,
       chatType: "direct",
+      ...(visibility ? { visibility } : {}),
     },
     assertSkillSelection,
   };
@@ -601,6 +611,7 @@ export async function prepareChatSendNativeRuntimeRestriction(params: {
     cfg,
     client,
     agentId,
+    sessionKey,
     getRuntimeConfig: context.getRuntimeConfig,
   });
   const committed = await commitReplySessionInitialization({

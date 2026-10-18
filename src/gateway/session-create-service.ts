@@ -108,6 +108,7 @@ import {
 } from "./session-lifecycle-preparation.js";
 import { loadSessionLifecycleRuntime } from "./session-lifecycle-runtime-loader.js";
 import { resolvePluginSessionOwnershipError } from "./session-plugin-ownership.js";
+import { resolveNewSessionVisibility } from "./session-profile-preferences.js";
 import { prepareSessionPublicShareGrant } from "./session-publication-grant.js";
 import * as sessionAgent from "./session-request-agent.js";
 import {
@@ -115,6 +116,7 @@ import {
   sessionCreationFailure,
   unavailableSessionRequest,
 } from "./session-request-error.js";
+import { resolveSessionVisibility } from "./session-sharing-policy.js";
 import { resolveGatewaySessionStoreTargetInWorker } from "./session-utils-store-worker.js";
 import type { GatewaySessionStoreTarget } from "./session-utils-store.types.js";
 import { loadGatewaySessionEntryReadOnly } from "./session-utils.js";
@@ -558,6 +560,14 @@ export async function createGatewaySession(
       creation: params.creation,
       parent: currentParentSessionEntry,
     });
+    const effectiveVisibility = resolveNewSessionVisibility({
+      cfg: params.cfg,
+      creator: creation?.actor,
+      // Validated below by resolveSessionCreateVisibility; imports pass their own default.
+      explicit: params.visibility ?? params.defaultVisibility,
+      inheritsDraft: resolveSessionVisibility(currentParentSessionEntry ?? {}) === "draft",
+      isMainSession: target.canonicalKey === agentMainSessionKey,
+    });
     const targetRead = await readSessionCreateTarget(
       { ...params, commitGuard },
       target,
@@ -849,7 +859,7 @@ export async function createGatewaySession(
             ? buildSessionCreationStamp({ ...creation, sandbox: creationSandbox, incognito })
             : {}),
           ...(createdNewEntry && inheritedSpawnOwner ? { owner: inheritedSpawnOwner } : {}),
-          ...(visibility.value && createdNewEntry ? { visibility: visibility.value } : {}),
+          ...(effectiveVisibility && createdNewEntry ? { visibility: effectiveVisibility } : {}),
           ...projectPreparedSessionWorkspace(existingEntry, {
             projectId,
             pendingProjectGitUrl,

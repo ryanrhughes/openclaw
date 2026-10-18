@@ -12,6 +12,7 @@ import { projectionLane } from "../config/sessions/session-transcript-worker-res
 import { withSessionHistoryWorkerDatabases } from "../config/sessions/session-transcript-worker-runtime.js";
 import type { SessionRowChange } from "../sessions/session-row-changes.js";
 import { retainOpenClawAgentDatabaseReadCandidates } from "../state/openclaw-agent-db.js";
+import { publishSessionMembershipSnapshot } from "./session-membership-snapshot.js";
 
 type SessionMembershipProjectionTarget = {
   agentId: string;
@@ -357,6 +358,18 @@ export function createSessionMembershipProjection(options: { env?: NodeJS.Proces
     const store = aliases.get(storePath);
     return !disposed && store ? (store.facts.get(sessionKey)?.[2] ?? noMembership) : undefined;
   }
+  function membershipForSessionKey(sessionKey: string) {
+    if (disposed) {
+      return undefined;
+    }
+    for (const store of new Set(aliases.values())) {
+      const fact = store.facts.get(sessionKey);
+      if (fact) {
+        return fact[2];
+      }
+    }
+    return undefined;
+  }
   function ready(storePath: string, sessionKey: string) {
     const store = aliases.get(storePath);
     return Boolean(
@@ -365,6 +378,7 @@ export function createSessionMembershipProjection(options: { env?: NodeJS.Proces
   }
   return {
     updateTargets,
+    membershipForSessionKey,
     invalidate,
     prepare,
     membership,
@@ -427,4 +441,11 @@ export function createSessionMembershipProjection(options: { env?: NodeJS.Proces
       groups = undefined;
     },
   };
+}
+
+/** The Gateway's resident projection; sharing filters read it through the published snapshot. */
+export function createPublishedSessionMembershipProjection() {
+  const membership = createSessionMembershipProjection();
+  publishSessionMembershipSnapshot(membership);
+  return membership;
 }

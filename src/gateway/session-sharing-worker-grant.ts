@@ -241,6 +241,7 @@ export async function prepareSessionSharingWorkerGrant(params: {
                 cfg: policyConfig,
                 client: params.request.client,
                 profiles,
+                target: () => null,
                 isMember: (_target, id) => facts.members.some((member) => member.identityId === id),
               });
               const error = authorizeGatewaySessionCreation(

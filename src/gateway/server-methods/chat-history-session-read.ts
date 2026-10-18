@@ -104,7 +104,8 @@ export async function prepareChatHistorySessionRead({
     sessionMutationAuthorization?.assertCurrent();
     if (
       current.entry
-        ? sharing.entryFilter?.(current.canonicalKey, current.entry) === false
+        ? !isGatewayAdmin(client) &&
+          sharing.entryFilter?.(current.canonicalKey, current.entry) === false
         : requestedSessionId && !retainedSessionId && !isGatewayAdmin(client)
     ) {
       respond(false, undefined, hiddenSessionNotFound(current.canonicalKey));
@@ -306,6 +307,7 @@ export async function prepareChatHistorySessionRead({
                   candidate.storePath === target.storePath &&
                   current.membership.has(identityId),
                 ),
+              target: () => target ?? null,
             }),
           );
           if (!sharing) {

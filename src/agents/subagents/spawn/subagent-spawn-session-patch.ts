@@ -133,6 +133,8 @@ export async function createInitialSubagentSession(params: {
       senderIsOwner: params.senderIsOwner,
       readParentEntry,
     });
+    const inheritsPrivate =
+      params.cfg.session?.sharing?.drafts !== false && parentEntry?.visibility === "draft";
     // Spawn owns a fresh child lifecycle. Cleanup freezes both fields before
     // launch so it cannot delete a reset successor that reuses the session id.
     const childSessionIdentity = {
@@ -266,6 +268,13 @@ export async function createInitialSubagentSession(params: {
               }
             : {}),
           ...childSessionIdentity,
+          ...(inheritsPrivate
+            ? {
+                visibility: "draft" as const,
+                // Members of the private root keep access through every inherited child.
+                privateAccessRoot: parentEntry?.privateAccessRoot ?? params.requesterInternalKey,
+              }
+            : {}),
           // Stamp after all request patches so model input cannot create a grant.
           ...parentLineage.receipt,
           ...(parentEntry?.skillLibrarySelections
@@ -283,6 +292,11 @@ export async function createInitialSubagentSession(params: {
                   inheritedGitContributorProfileIds:
                     inheritSessionGitContributorProfileIds(parentEntry),
                 }
+              : {}),
+            // Private is an isolation policy: like a required sandbox, the child keeps the
+            // parent's human creator so the person who spawned it retains access.
+            ...(inheritsPrivate && parentEntry?.createdActor?.type === "human"
+              ? { actor: parentEntry.createdActor }
               : {}),
           }),
         },

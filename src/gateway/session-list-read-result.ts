@@ -1,6 +1,9 @@
 import type { GatewayClient } from "./server-methods/types.js";
 import { withReadySessionRows } from "./session-row-prepared-read.js";
-import { prepareProjectedSessionPresentation } from "./session-row-presentation.js";
+import {
+  prepareProjectedSessionPresentation,
+  toProjectedSessionSharingTarget,
+} from "./session-row-presentation.js";
 import type { MaterializedRow } from "./session-row-projection-record.js";
 import type { SessionRowProjection } from "./session-row-projection.js";
 
@@ -122,7 +125,11 @@ export async function withCurrentSessionListRows<T>(
         }
         return (
           !presentation.authorizeDescription(query) &&
-          presentation.sharing.entryFilter?.(record.key, record.entry) !== false
+          presentation.sharing.entryFilter?.(
+            record.key,
+            record.entry,
+            toProjectedSessionSharingTarget(record),
+          ) !== false
         );
       });
       return consume(visible);

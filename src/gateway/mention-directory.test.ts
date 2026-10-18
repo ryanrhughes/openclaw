@@ -20,6 +20,7 @@ import {
 import { invalidateOperatorRolePolicy } from "./operator-role-policy.js";
 import { soloClient } from "./server-methods/sessions-sharing.test-support.js";
 import type { GatewayRequestHandlerOptions } from "./server-methods/types.js";
+import { applySessionProfilePreferenceChanges } from "./session-profile-preferences.js";
 
 type MentionFixture = Parameters<Parameters<typeof withInbox>[0]>[0];
 
@@ -243,12 +244,23 @@ describe("human mention directory", () => {
 
   it.each([
     {
-      name: "administrator receiving a draft",
+      // Private sessions need an invite or the admin opt-in, even for administrators.
+      name: "uninvited administrator receiving a draft",
+      role: "administrator",
+      sessionKey: SESSION_KEY,
+      entry: { visibility: "draft" },
+      visible: false,
+      storedSources: 1,
+      showOthersPrivate: false,
+    },
+    {
+      name: "opted-in administrator receiving a draft",
       role: "administrator",
       sessionKey: SESSION_KEY,
       entry: { visibility: "draft" },
       visible: true,
       storedSources: 1,
+      showOthersPrivate: true,
     },
     {
       name: "owner-only recipient of a shared session",
@@ -257,6 +269,7 @@ describe("human mention directory", () => {
       entry: { visibility: "shared" },
       visible: false,
       storedSources: 1,
+      showOthersPrivate: false,
     },
     {
       name: "administrator in an entry-flag incognito session",
@@ -265,6 +278,7 @@ describe("human mention directory", () => {
       entry: { visibility: "shared", incognito: true },
       visible: false,
       storedSources: 0,
+      showOthersPrivate: false,
     },
     {
       name: "administrator in a canonical-key incognito session",
@@ -273,10 +287,11 @@ describe("human mention directory", () => {
       entry: { visibility: "shared" },
       visible: false,
       storedSources: 0,
+      showOthersPrivate: false,
     },
   ] as const)(
     "applies offline recipient policy across directory, admission, and delivery: $name",
-    async ({ role, sessionKey, entry, visible, storedSources }) => {
+    async ({ role, sessionKey, entry, visible, storedSources, showOthersPrivate }) => {
       const cfg: OpenClawConfig = {
         gateway: {
           roles: {
@@ -304,6 +319,9 @@ describe("human mention directory", () => {
         invalidateOperatorRolePolicy(f.bob.id);
         f.aliceClient.connect.scopes = ["operator.admin"];
         f.bobClient.connect.scopes = ["operator.admin"];
+        if (showOthersPrivate) {
+          applySessionProfilePreferenceChanges(f.bob.id, { "sessions.showOthersPrivate": true });
+        }
         f.clients.length = 0;
         const sessionId = sessionKey === SESSION_KEY ? SESSION_ID : "incognito-policy-session";
         await f.setSession({ sessionId, ...entry }, sessionKey);

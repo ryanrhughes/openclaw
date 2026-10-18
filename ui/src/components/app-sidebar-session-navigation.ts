@@ -94,6 +94,7 @@ import {
   sidebarRowsInputs,
   SidebarProjectionMemo,
 } from "./sidebar-projection-memo.ts";
+import { SidebarShowOthersPrivatePreference } from "./sidebar-show-others-private.ts";
 
 export class AppSidebarSessionNavigationElement extends AppSidebarBase {
   @state() rosterSessionSource: {
@@ -196,6 +197,21 @@ export class AppSidebarSessionNavigationElement extends AppSidebarBase {
   @state() sessionsShowCron = loadStoredSidebarSessionsShowCron();
   @state() sessionsShowPreview = loadStoredSidebarSessionsShowPreview();
   @state() sessionsShowSystem = loadStoredSidebarSessionsShowSystem();
+  @state() sessionsShowOthersPrivate = false;
+  private readonly showOthersPrivate = new SidebarShowOthersPrivatePreference(
+    () => this.sessionsShowOthersPrivate,
+    (show) => (this.sessionsShowOthersPrivate = show),
+  );
+
+  get sessionsShowOthersPrivateOption(): boolean | undefined {
+    return this.showOthersPrivate.option(this.context?.gateway.snapshot);
+  }
+
+  setSessionsShowOthersPrivate(show: boolean) {
+    void this.showOthersPrivate.save(this.context?.gateway.snapshot.client, show, () =>
+      this.sessionData.refreshSidebarSessions(),
+    );
+  }
   private readonly emptyGroups = new SidebarEmptyGroupsController(this, () => this.context);
 
   get sessionsEmptyGroupsMode(): SidebarEmptyGroupsMode {

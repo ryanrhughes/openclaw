@@ -320,7 +320,7 @@ describe("session suggestion visibility and role ceilings", () => {
     });
   });
 
-  it("hides draft suggestions from members while owner and admin can list", async () => {
+  it("lets invited members read draft suggestions while owner and admin can list", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const draftKey = "agent:main:draft-suggestions";
       await upsertSessionEntryCore(
@@ -346,31 +346,36 @@ describe("session suggestion visibility and role ceilings", () => {
         },
       );
 
+      // Fork: invited members participate in private (draft) sessions, so they can read its
+      // suggestions; drafts still accept no new suggestions and only owners/admins resolve.
       const member = client("member", "Member");
-      const expectHiddenDraft = (result: Awaited<ReturnType<typeof call>>) => {
-        expect(result.responses[0]?.[0]).toBe(false);
-        expect(result.responses[0]?.[1]).toBeUndefined();
-        expect(result.responses[0]?.[2]).toMatchObject({
-          message: "session is draft for this connection",
-          details: {
-            code: "SESSION_PARTICIPATION_REQUIRED",
-            sessionKey: draftKey,
-            visibility: "draft",
-          },
-        });
-      };
-
-      expectHiddenDraft(await call("session.suggestions.list", { sessionKey: draftKey }, member));
-      expectHiddenDraft(
-        await call("session.suggestions.add", { sessionKey: draftKey, text: "leak draft" }, member),
-      );
-      expectHiddenDraft(
-        await call(
-          "session.suggestions.resolve",
-          { sessionKey: draftKey, id: "draft-suggestion", resolution: "dismiss" },
-          member,
-        ),
-      );
+      expect(
+        (await call("session.suggestions.list", { sessionKey: draftKey }, member)).responses[0],
+      ).toMatchObject([
+        true,
+        {
+          role: "member",
+          suggestions: [{ id: "draft-suggestion", text: "private draft suggestion" }],
+        },
+      ]);
+      expect(
+        (
+          await call(
+            "session.suggestions.add",
+            { sessionKey: draftKey, text: "member draft" },
+            member,
+          )
+        ).responses[0],
+      ).toMatchObject([false, undefined, { message: "session is not accepting suggestions" }]);
+      expect(
+        (
+          await call(
+            "session.suggestions.resolve",
+            { sessionKey: draftKey, id: "draft-suggestion", resolution: "dismiss" },
+            member,
+          )
+        ).responses[0],
+      ).toMatchObject([false, undefined, { message: "session owner or operator.admin required" }]);
       expect(
         (
           await call(

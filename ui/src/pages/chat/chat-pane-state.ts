@@ -53,7 +53,10 @@ export class SessionParticipationTracker {
     if (params.session) {
       const blocked =
         params.session.visibility === "draft"
-          ? params.session.sharingRole !== "admin" && params.session.sharingRole !== "owner"
+          ? // Invited members participate in private sessions, like the owner and admins.
+            params.session.sharingRole !== "admin" &&
+            params.session.sharingRole !== "owner" &&
+            params.session.sharingRole !== "member"
           : params.session.visibility !== undefined &&
             params.session.visibility !== "shared" &&
             params.session.sharingRole === "viewer";

@@ -1,4 +1,5 @@
 import type { ProjectsAddResult } from "../../../../packages/gateway-protocol/src/index.js";
+import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import { t } from "../../i18n/index.ts";
 import { registerNewSessionSetupEnglish } from "../../i18n/locales/en-new-session-setup.ts";
 import type { ChatAttachment, HumanMention } from "../../lib/chat/chat-types.ts";
@@ -20,6 +21,7 @@ import * as catalog from "./catalog-target.ts";
 import { NewSessionComposerTextareaController } from "./composer-controller.ts";
 import type { DraftSessionCreateOverrides, NewSessionVisibility } from "./create-params.ts";
 import { buildSelectedSessionCreateParams } from "./draft-create-params.ts";
+import { readDefaultSessionVisibility } from "./draft-default-visibility.ts";
 import type { DraftGatewayState } from "./draft-gateway-state.ts";
 import { NewSessionDraftPersistence } from "./draft-persistence.ts";
 import type { DraftPlaceState } from "./draft-place-state.ts";
@@ -58,6 +60,9 @@ type SubmittedDraft = ReturnType<NewSessionDraftPersistence["captureSubmission"]
 
 export class DraftSubmissionFlow {
   private visibilityValue: NewSessionVisibility = "normal";
+  private defaultVisibilityValue: "shared" | "private" | undefined;
+  private visibilityTouched = false;
+  private defaultVisibilityClient: unknown;
   private messageText = "";
 
   private updateMessage(message: string) {
@@ -111,7 +116,7 @@ export class DraftSubmissionFlow {
           message,
           mentions,
           attachments,
-          visibility: resetVisibility ? "normal" : this.visibilityValue,
+          visibility: resetVisibility ? this.initialVisibility() : this.visibilityValue,
         });
       },
       () => this.setError(CHAT_COMPOSER_DRAFT_STORAGE_ERROR),
@@ -125,6 +130,32 @@ export class DraftSubmissionFlow {
 
   get visibility(): NewSessionVisibility {
     return this.visibilityValue;
+  }
+
+  get defaultVisibility(): "shared" | "private" | undefined {
+    return this.defaultVisibilityValue;
+  }
+
+  private initialVisibility(): NewSessionVisibility {
+    return this.defaultVisibilityValue === "private" ? "draft" : "normal";
+  }
+
+  /** Preselects Private from the person's effective default: their preference, else the Gateway's. */
+  loadDefaultVisibility(client: GatewayBrowserClient | null | undefined) {
+    if (!client || this.defaultVisibilityClient === client) {
+      return;
+    }
+    this.defaultVisibilityClient = client;
+    void readDefaultSessionVisibility(client).then((loaded) => {
+      if (this.defaultVisibilityClient !== client || !loaded.ok) {
+        return;
+      }
+      this.defaultVisibilityValue = loaded.value;
+      if (!this.visibilityTouched && this.visibilityValue !== "incognito") {
+        this.visibilityValue = this.initialVisibility();
+        this.callbacks.requestUpdate();
+      }
+    });
   }
 
   get message(): string {
@@ -221,6 +252,7 @@ export class DraftSubmissionFlow {
 
   setVisibility(visibility: NewSessionVisibility) {
     this.startedSession.current = null;
+    this.visibilityTouched = true;
     const wasIncognito = this.visibilityValue === "incognito";
     const publish = this.callbacks.requestUpdate;
     this.visibilityValue = visibility;
@@ -269,6 +301,7 @@ export class DraftSubmissionFlow {
       toolOverrides: this.capabilities.toolOverrides,
       permissionMode: this.permissionMode,
       visibility: options.visibility ?? this.visibility,
+      defaultVisibility: this.defaultVisibility,
       catalogId: this.read().data?.catalogId,
       category: this.gateway.resolvedGroupCategory(),
     });
@@ -348,7 +381,8 @@ export class DraftSubmissionFlow {
     this.submissionOutcomeUnknown = preservePendingPlacement
       ? (this.submissionOutcomeUnknown ?? "placement-interrupted")
       : null;
-    this.visibilityValue = "normal";
+    this.visibilityValue = this.initialVisibility();
+    this.visibilityTouched = false;
     this.capabilities.reset();
     this.permissionMode = undefined;
     this.attachmentDraft.reset();

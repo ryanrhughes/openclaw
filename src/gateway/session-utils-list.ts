@@ -36,7 +36,10 @@ import {
 } from "./session-list-order.js";
 import { bindSessionListRowRead } from "./session-list-read-result.js";
 import { withReadySessionRows } from "./session-row-prepared-read.js";
-import { prepareSessionRowPublication } from "./session-row-presentation.js";
+import {
+  prepareSessionRowPublication,
+  toProjectedSessionSharingTarget,
+} from "./session-row-presentation.js";
 import {
   identity as rowIdentity,
   selectionRow,
@@ -484,7 +487,18 @@ export function prepareProjectedSessionList(params: {
       if (visible === undefined) {
         visible = Boolean(
           row &&
-          (client === undefined || (presentation.sharing.entryFilter?.(row.key, entry) ?? true)),
+          (client === undefined ||
+            (presentation.sharing.entryFilter?.(
+              row.key,
+              entry,
+              toProjectedSessionSharingTarget({
+                agentId: row.agentId,
+                key: row.key,
+                entry,
+                storeTarget: row.storeTarget,
+              }),
+            ) ??
+              true)),
         );
         params.visibility?.set(entry, visible);
       }

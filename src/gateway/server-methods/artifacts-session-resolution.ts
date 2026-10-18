@@ -212,10 +212,10 @@ export async function prepareArtifactSessionResolution(
           });
           const visibilityDenied = Boolean(
             target &&
-            createSessionListEntryFilter({ client, cfg: currentConfig })?.(
-              target.storeKey,
-              target.entry,
-            ) === false,
+            // Direct key and run selectors: admins keep access to named private sessions.
+            createSessionListEntryFilter({ client, cfg: currentConfig }, undefined, undefined, {
+              adminDirectAccess: true,
+            })?.(target.storeKey, target.entry) === false,
           );
           if (!error && !visibilityDenied) {
             return current;

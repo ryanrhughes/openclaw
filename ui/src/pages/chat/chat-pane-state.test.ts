@@ -300,11 +300,13 @@ describe("SessionParticipationTracker", () => {
     });
 
   it.each([
-    { visibility: "draft", sharingRole: "member", blocked: true },
+    { visibility: "draft", sharingRole: "viewer", blocked: true },
     { visibility: "read-only", sharingRole: "viewer", blocked: true },
     { visibility: "shared", sharingRole: "member", blocked: false },
+    // Invited members act in private sessions alongside the owner and admins.
+    { visibility: "draft", sharingRole: "member", blocked: false },
   ] as const)(
-    "holds only observed restrictions while refreshing: $visibility",
+    "holds only observed restrictions while refreshing: $visibility $sharingRole",
     ({ visibility, sharingRole, blocked }) => {
       const tracker = new SessionParticipationTracker();
       expect(resolve(tracker, { session: { visibility, sharingRole } })).toBe(blocked);
@@ -322,7 +324,7 @@ describe("SessionParticipationTracker", () => {
     const tracker = new SessionParticipationTracker();
     const sessionKey = "main\0global";
     expect(
-      resolve(tracker, { sessionKey, session: { visibility: "draft", sharingRole: "member" } }),
+      resolve(tracker, { sessionKey, session: { visibility: "draft", sharingRole: "viewer" } }),
     ).toBe(true);
     expect(resolve(tracker, { sessionKey, listLoading: true })).toBe(true);
     if (change === "connection") {

@@ -514,6 +514,19 @@ export function renderSidebarSessionSortMenuForController(controller: SidebarMen
           )}
           ${switchItem("sidebar-sessions-cron", t("sessionsView.showCronSessions"), host.sessionsShowCron, (show) => host.sessionOrganizer.setSessionsShowCron(show))}
           ${switchItem("sidebar-sessions-system", t("sessionsView.showSystemSessions"), host.sessionsShowSystem, (show) => host.sessionOrganizer.setSessionsShowSystem(show))}
+          ${
+            host.sessionsShowOthersPrivateOption === undefined
+              ? nothing
+              : switchItem(
+                  "sidebar-sessions-others-private",
+                  t("sessionsView.showOthersPrivateSessions"),
+                  host.sessionsShowOthersPrivateOption,
+                  (show) => {
+                    host.setSessionsShowOthersPrivate(show);
+                    controller.closePositionedMenu("sessionSort", { restoreFocus: true });
+                  },
+                )
+          }
         </section>
         <section
           class="sidebar-session-menu-section"

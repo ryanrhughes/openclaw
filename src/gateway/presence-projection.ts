@@ -78,6 +78,7 @@ export function createPresenceRecipientProjection(params: {
       cfg,
       client,
       isMember: () => false,
+      target: () => null,
     });
     const visible = new Set<string>();
     const indexes: number[] = [];

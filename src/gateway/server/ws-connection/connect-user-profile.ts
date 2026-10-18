@@ -16,6 +16,7 @@ import {
 } from "../../local-user-ingress.js";
 import { hasGatewayOperatorAccessPolicies } from "../../operator-access-policy.js";
 import { WEBSOCKET_OPEN_READY_STATE } from "../../server-constants.js";
+import { loadSessionProfilePreferences } from "../../session-profile-preferences.js";
 import { formatForLog } from "../../ws-log.js";
 import type { GatewayWsClient } from "../ws-types.js";
 import {
@@ -87,6 +88,8 @@ export function createGatewayConnectProfileLifecycle(
   };
 }
 
+const SESSION_PREFERENCES_CONNECT_WAIT_MS = 500;
+
 async function resolveAuthenticatedProfile(
   profileId: string,
   updatedAt: number,
@@ -103,6 +106,16 @@ async function resolveAuthenticatedProfile(
     throw new Error("Gateway profile changed during acquisition");
   }
   const { id, displayName, avatarRevision, hasAvatar } = authority.display;
+  // Session preferences (the admin private-sessions opt-in) should be current for the first
+  // request, but a slow or failed read must not stall connect: wait briefly, then let it land
+  // in the background. Until it does the opt-in reads as off, so private sessions stay hidden.
+  await Promise.race([
+    loadSessionProfilePreferences(id).catch(() => undefined),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, SESSION_PREFERENCES_CONNECT_WAIT_MS).unref();
+    }),
+  ]);
+  assertCurrent?.();
   return {
     profile: { profileId: id, displayName, avatarRevision, hasAvatar, updatedAt },
     authority,
