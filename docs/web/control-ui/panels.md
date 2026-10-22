@@ -13,7 +13,7 @@ Surfaces that dock beside the current page instead of replacing it.
 
 ## OpenClaw system care
 
-Open **Settings → Ask OpenClaw** to talk to the system setup and repair agent. To open it alongside your current page, click **Home** in the sidebar footer and select the **Ask OpenClaw** tab, or use the **Ask OpenClaw** command-palette action. The full page and dockable panel share one machine-wide conversation whose durable history lives on the Gateway. Closing the UI never cancels a turn; reopening Ask OpenClaw shows the completed conversation. The panel docks on the right or bottom, remembers its placement and size in the browser profile, and hides itself while the full page is open.
+Open **Settings → Ask OpenClaw** to talk to the system setup and repair agent. To open it alongside your current page, click **Open shared Team chat** in the sidebar footer and select the **Ask OpenClaw** tab, or use the **Ask OpenClaw** command-palette action. The full page and dockable panel share one machine-wide conversation whose durable history lives on the Gateway. Closing the UI never cancels a turn; reopening Ask OpenClaw shows the completed conversation. The panel docks on the right or bottom, remembers its placement and size in the browser profile, and hides itself while the full page is open.
 
 If no AI provider is configured, Ask OpenClaw offers **Connect an AI provider**. If a configured runtime fails to start or verify, the conversation stays visible with the actual error and **Retry**. Sending stays disabled until verification succeeds. Retry checks the runtime without resending your earlier message or clearing your draft.
 
@@ -29,9 +29,11 @@ Say `import memory` to copy detected local memory into the existing default agen
 
 Outside onboarding, this page can show at most one dismissible event chip per visit. It stays silent for routine Gateway traffic and reacts only to health snapshots that report a disabled configuration reloader, a configured channel disconnect/degradation, a failed channel check, or unavailable channel credentials. A newer event replaces the pending chip only when it is more severe; dismissing or using the chip silences event prompts for that visit. Clicking the chip sends its diagnosis question as a real `openclaw.chat` message, so the transcript records the request and OpenClaw performs the diagnosis. Onboarding never shows these event chips.
 
-## Home dock
+<a id="home-dock" />
 
-Use the **Home** button in the sidebar footer, or in the toolbar when the sidebar is collapsed, to open the selected agent's main conversation alongside your current page. Select the **Ask OpenClaw** tab in the same dock for system setup and repair. When the same Home conversation is already open as the page, the dock stays hidden rather than showing it twice.
+## Team chat dock
+
+Use **Open shared Team chat** in the sidebar footer, or in the toolbar when the sidebar is collapsed, to open the selected agent's shared main conversation alongside your current page. **Home** in the navigation opens the landing page for new and recent sessions. Select the **Ask OpenClaw** tab in the same dock for system setup and repair. When the same Home conversation is already open as the page, the dock stays hidden rather than showing it twice.
 
 Your Home draft and attachments follow the conversation between the page and dock. Files still being prepared keep their progress and Remove action, and Send waits until preparation finishes.
 

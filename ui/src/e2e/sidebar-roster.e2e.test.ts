@@ -180,7 +180,10 @@ suite.define(() => {
           )
           .toEqual(["main", "forge", "scout", "bloom"]);
         await expect.poll(() => sessionRows.count()).toBe(8);
-        expect(await sidebar.getByRole("link", { name: "Home", exact: true }).count()).toBe(0);
+        expect(await sidebar.getByRole("link", { name: "Home", exact: true }).count()).toBe(1);
+        expect(
+          await sidebar.getByRole("link", { name: "Home", exact: true }).getAttribute("href"),
+        ).toBe("/home");
         await expectWorkspace();
         expect(await sidebar.locator(".sidebar-session-toolbar").count()).toBe(0);
         expect(await sidebar.locator(".sidebar-brand__actions .sidebar-session-sort").count()).toBe(
@@ -390,7 +393,7 @@ suite.define(() => {
         await page.keyboard.press("Space");
         await actions.getByRole("menuitem", { name: "All sessions", exact: true }).waitFor();
         expect(await actions.locator("wa-dropdown-item").allTextContents()).toEqual([
-          expect.stringContaining("Open main chat"),
+          expect.stringContaining("Open shared Team chat"),
           expect.stringContaining("All sessions"),
           expect.stringContaining("Collapse others"),
         ]);
@@ -429,7 +432,7 @@ suite.define(() => {
           .poll(() => sidebar.locator('[data-agent-collapse][aria-expanded="false"]').count())
           .toBe(3);
         await options.press("Enter");
-        await actions.getByRole("menuitem", { name: "Open main chat", exact: true }).click();
+        await actions.getByRole("menuitem", { name: "Open shared Team chat", exact: true }).click();
         await waitForControlUiRoute(page, { routeId: "chat", pathname: "/chat/forge" });
         await actions.locator("a").press("Space");
         await waitForControlUiRoute(page, { routeId: "new-session", pathname: "/new" });

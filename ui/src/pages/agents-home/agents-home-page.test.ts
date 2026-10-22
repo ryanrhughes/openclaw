@@ -211,7 +211,7 @@ describe("AgentsHomePage", () => {
     );
 
     const openChat = cards[0]?.querySelector<HTMLElement>(".agents-home__open");
-    expect(openChat?.textContent).toBe("Open chat");
+    expect(openChat?.textContent).toBe("Open shared Team chat");
     openChat?.click();
     expect(navigate).toHaveBeenCalledExactlyOnceWith("chat", { pathname: "/chat/ember" });
   });

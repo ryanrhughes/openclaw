@@ -117,7 +117,7 @@ describe("Context attachment mocked Gateway E2E", () => {
       expect(
         await page.locator(".chat-bubble").filter({ hasText: text }).first().textContent(),
       ).not.toContain("Working context captured");
-      await page.getByRole("button", { name: "Talk to your Home agent", exact: true }).click();
+      await page.getByRole("button", { name: "Open shared Team chat", exact: true }).click();
       const home = page.locator("openclaw-home-session");
       const composer = home.locator(".agent-chat__composer-combobox textarea");
       await composer.fill("Please review the captured file.");

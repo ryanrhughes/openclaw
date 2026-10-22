@@ -9,10 +9,12 @@ export function isDefaultChatLanding(
   basePath: string,
   routeIdFromPath: (pathname: string, basePath: string) => string | null,
 ): boolean {
+  const routeId = routeIdFromPath(location.pathname, basePath);
   return (
     !new URLSearchParams(location.search + "&" + location.hash.slice(1)).has("session") &&
     !pluginSlugCandidate(location.pathname, basePath) &&
-    (routeIdFromPath(location.pathname, basePath) === null ||
+    (routeId === "home" ||
+      routeId === null ||
       /^\/chat(?:\/main)?\/?$/u.test(location.pathname.slice(basePath.length)))
   );
 }

@@ -214,7 +214,10 @@ export function bootstrapApplication(): ApplicationRuntime {
   const agents = createAgentCapability(gateway);
   const startupLifecycle = createStartupLifecycle();
   const parsedInitialSession = parseAgentSessionKey(settings.sessionKey);
-  const deferInitialLocationUntilGateway = firstRunDefaultLanding && !parsedInitialSession;
+  const deferInitialLocationUntilGateway =
+    firstRunDefaultLanding &&
+    routeIdFromPath(applicationLocation.pathname, basePath) !== "home" &&
+    !parsedInitialSession;
   let resolveInitialFirstRunDecision: (() => void) | null = null;
   const initialFirstRunDecision = deferInitialLocationUntilGateway
     ? new Promise<void>((resolve) => {
@@ -594,8 +597,8 @@ export function bootstrapApplication(): ApplicationRuntime {
           });
         });
       }
-      // Resolve first-run setup before routing: the default Chat route owns the
-      // workspace graph, which setup users would otherwise fetch and discard.
+      // Chat waits for the setup decision before fetching its workspace graph.
+      // Home can render immediately while the same subscription checks setup.
       steps.push(() =>
         startModelSetupFirstRunRedirectAfterLocation({
           context,

@@ -34,6 +34,41 @@ describe("bootstrapApplication", () => {
     saveSettings(previousSettings);
   });
 
+  it.each(["main", "agent:main:main", "agent:research:private-notes"])(
+    "starts Home before Gateway readiness with remembered session %s",
+    async (sessionKey) => {
+      saveSettings({
+        ...previousSettings,
+        sessionKey,
+        lastActiveSessionKey: sessionKey,
+      });
+      window.history.replaceState({}, "", "/?keep=yes#pane");
+      const runtime = bootstrapApplication();
+      const homeRoute = runtime.router.getRoute("home");
+      if (!homeRoute) {
+        throw new Error("Missing Home route");
+      }
+      const homeComponent = vi
+        .spyOn(homeRoute, "component")
+        .mockResolvedValue({ render: () => null });
+      const startGateway = vi.spyOn(runtime.context.gateway, "start").mockImplementation(() => {});
+
+      try {
+        await runtime.start();
+
+        expect(runtime.context.gateway.snapshot.phase).toBe("stopped");
+        expect(runtime.router.getState().matches[0]?.routeId).toBe("home");
+        expect(window.location.pathname + window.location.search + window.location.hash).toBe(
+          "/?keep=yes#pane",
+        );
+      } finally {
+        runtime.stop();
+        homeComponent.mockRestore();
+        startGateway.mockRestore();
+      }
+    },
+  );
+
   it("owns native health reporting across startup and stop", async () => {
     window.history.replaceState({}, "", "/focus/terminal");
     const postMessage = vi.fn();

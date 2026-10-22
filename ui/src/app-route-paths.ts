@@ -37,6 +37,7 @@ type AgentRoutePath = {
 };
 
 const APP_ROUTE_DEFINITIONS = {
+  home: { path: "/home", aliases: ["/"] },
   settings: { path: "/settings" },
   chat: { path: "/chat" },
   terminal: { path: "/terminal" },

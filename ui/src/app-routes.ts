@@ -45,6 +45,7 @@ import {
   permissionsPage as devicePermissionsPage,
 } from "./pages/device/route.ts";
 import { page as devicesPage } from "./pages/devices/route.ts";
+import { page as homePage } from "./pages/home/route.ts";
 import { page as labsPage } from "./pages/labs/route.ts";
 import { page as lobsterdexPage } from "./pages/lobsterdex/route.ts";
 import { page as logsPage } from "./pages/logs/route.ts";
@@ -84,6 +85,7 @@ export type ApplicationRouter = Router<RouteId, ApplicationContext, AppRouteModu
 type AppRoute = PageDefinition<RouteId, ApplicationContext, AppRouteModule>;
 
 const APP_ROUTE_TREE = [
+  homePage,
   ...chatPages,
   custodianPage,
   newSessionPage,
@@ -242,7 +244,7 @@ export async function startApplicationRouter(
   ) {
     history.replace({
       ...location,
-      pathname: router.pathForRoute("chat", basePath),
+      pathname: router.pathForRoute("home", basePath),
     });
     location = history.location();
   }

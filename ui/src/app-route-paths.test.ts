@@ -453,7 +453,7 @@ describe("Dynamic route startup bridge", () => {
   );
 
   it("keeps a loader not-found state without rejecting startup", async () => {
-    let location: RouteLocation = { pathname: "/", search: "", hash: "" };
+    let location: RouteLocation = { pathname: "/chat", search: "", hash: "" };
     const history: RouterHistory = {
       location: () => location,
       push: vi.fn(),

@@ -1,6 +1,6 @@
 import type { RouteLocation } from "@openclaw/uirouter";
 import type { AgentsListResult } from "../api/types.ts";
-import { pathForRoute } from "../app-route-paths.ts";
+import { pathForRoute, routeIdFromPath } from "../app-route-paths.ts";
 import type { BoardFace } from "../lib/board/settings.ts";
 import { normalizeAgentId } from "../lib/sessions/session-key.ts";
 
@@ -34,7 +34,9 @@ export function releasedSessionQuery(
   const chatRoot = pathForRoute("chat", basePath);
   const dashboardRoot = pathForRoute("dashboard", basePath);
   const pathFace =
-    location.pathname === chatRoot || location.pathname === `${chatRoot}/`
+    routeIdFromPath(location.pathname, basePath) === "home" ||
+    location.pathname === chatRoot ||
+    location.pathname === `${chatRoot}/`
       ? "chat"
       : location.pathname === dashboardRoot || location.pathname === `${dashboardRoot}/`
         ? "dashboard"

@@ -24,6 +24,7 @@ export const CONTROL_UI_RESERVED_ROUTE_SEGMENTS: readonly string[] = Object.free
   "dashboards",
   "debug",
   "focus",
+  "home",
   "infrastructure",
   "lobsterdex",
   "logs",

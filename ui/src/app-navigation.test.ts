@@ -222,8 +222,10 @@ describe("routeIdFromPath", () => {
     expect(routeIdFromPath("/about")).toBeNull();
   });
 
-  it("leaves root fallback to application startup", () => {
-    expect(routeIdFromPath("/")).toBeNull();
+  it("routes the root and mounted root to the personal Home landing page", () => {
+    expect(routeIdFromPath("/")).toBe("home");
+    expect(routeIdFromPath("/home")).toBe("home");
+    expect(routeIdFromPath("/oodle/", "/oodle")).toBe("home");
   });
 
   it("handles base paths", () => {

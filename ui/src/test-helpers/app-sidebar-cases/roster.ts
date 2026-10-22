@@ -275,7 +275,7 @@ describe("AppSidebar agent roster", () => {
     expect(sidebar.querySelector(".nav-item--home")).not.toBeNull();
     await toggleRoster(sidebar);
     await vi.waitFor(() => expect(sessionKeys(sidebar)).toContain("agent:working:recent"));
-    expect(sidebar.querySelector(".nav-item--home")).toBeNull();
+    expect(sidebar.querySelector(".nav-item--home")?.getAttribute("href")).toBe("/home");
     sidebar.querySelector<HTMLButtonElement>('[data-agent-collapse="recent"]')?.click();
     await vi.waitFor(() => expect(sessionKeys(sidebar)).not.toContain("agent:recent:recent"));
     expect(onNavigate).not.toHaveBeenCalled();

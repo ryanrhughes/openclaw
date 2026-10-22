@@ -1,16 +1,71 @@
 import { describe, expect, it, vi } from "vitest";
+import { routeIdFromPath } from "../app-route-paths.ts";
 import { sessionRefFromPath } from "../app-session-route-paths.ts";
-import { resolveInitialApplicationLocation } from "./bootstrap-location.ts";
+import {
+  normalizeInitialApplicationLocation,
+  resolveBootstrapModelCatalogTarget,
+  resolveInitialApplicationLocation,
+} from "./bootstrap-location.ts";
 import type { ApplicationContext } from "./context.ts";
 
 describe("resolveInitialApplicationLocation", () => {
+  it.each([
+    { pathname: "/", basePath: "", sessionKey: "agent:main:main", routeId: "home" },
+    {
+      pathname: "/home",
+      basePath: "",
+      sessionKey: "agent:research:private-notes",
+      routeId: "home",
+    },
+    { pathname: "/openclaw/", basePath: "/openclaw", sessionKey: "main", routeId: "home" },
+    {
+      pathname: "/openclaw/home",
+      basePath: "/openclaw",
+      sessionKey: "agent:research:private-notes",
+      routeId: "home",
+    },
+    { pathname: "/missing/route", basePath: "", sessionKey: "agent:main:main", routeId: null },
+  ])(
+    "leaves $pathname to its route without restoring $sessionKey",
+    async ({ pathname, basePath, sessionKey, routeId }) => {
+      const location = { pathname, search: "?keep=yes", hash: "#pane" };
+      const subscribe = vi.fn(() => () => undefined);
+      const ensureAgentsList = vi.fn();
+
+      await expect(
+        resolveInitialApplicationLocation({
+          location,
+          basePath,
+          sessionKey,
+          gateway: {
+            snapshot: { phase: "connecting", client: null, hello: null },
+            subscribe,
+          } as unknown as ApplicationContext["gateway"],
+          agentsList: () => null,
+          ensureAgentsList,
+          signal: new AbortController().signal,
+        }),
+      ).resolves.toBe(location);
+
+      expect(normalizeInitialApplicationLocation(location, basePath, sessionKey, "main")).toBe(
+        location,
+      );
+      expect(routeIdFromPath(location.pathname, basePath)).toBe(routeId);
+      expect(subscribe).not.toHaveBeenCalled();
+      expect(ensureAgentsList).not.toHaveBeenCalled();
+      expect(resolveBootstrapModelCatalogTarget(location, basePath, "wss://home.example")).toBe(
+        undefined,
+      );
+    },
+  );
+
   it.each([
     { sessionKey: "telegram:12345", search: "", pathname: "/chat/main/telegram/12345" },
     { sessionKey: "agent::broken", search: "?draft=hello", pathname: null },
   ])(
     "resolves persisted '$sessionKey' without aborting bootstrap",
     async ({ sessionKey, search, pathname }) => {
-      const location = { pathname: "/", search, hash: "" };
+      const location = { pathname: "/chat", search, hash: "" };
       const resolved = await resolveInitialApplicationLocation({
         location,
         basePath: "",
@@ -50,7 +105,7 @@ describe("resolveInitialApplicationLocation", () => {
         },
       };
       const pending = resolveInitialApplicationLocation({
-        location: { pathname: "/", search: "", hash: "" },
+        location: { pathname: "/chat", search: "", hash: "" },
         basePath: "",
         sessionKey: persistedSessionKey,
         gateway,
@@ -116,7 +171,7 @@ describe("resolveInitialApplicationLocation", () => {
 
     await expect(
       resolveInitialApplicationLocation({
-        location: { pathname: "/", search: "", hash: "" },
+        location: { pathname: "/chat", search: "", hash: "" },
         basePath: "",
         sessionKey: "agent:research:workspace",
         gateway: {
@@ -137,11 +192,53 @@ describe("resolveInitialApplicationLocation", () => {
   it.each([
     {
       location: {
+        pathname: "/",
+        search: "?session=agent%3Aresearch%3Atelegram%3A12345&keep=yes",
+        hash: "#pane",
+      },
+      expected: { pathname: "/chat/research/telegram/12345", search: "?keep=yes", hash: "#pane" },
+      basePath: "",
+      namespace: "chat",
+      sessionKey: "agent:research:telegram:12345",
+    },
+    {
+      location: {
+        pathname: "/openclaw/",
+        search: "?session=agent%3Aresearch%3Atelegram%3A12345&face=dashboard&keep=yes",
+        hash: "#pane",
+      },
+      expected: {
+        pathname: "/openclaw/dashboard/research/telegram/12345",
+        search: "?keep=yes",
+        hash: "#pane",
+      },
+      basePath: "/openclaw",
+      namespace: "dashboard",
+      sessionKey: "agent:research:telegram:12345",
+    },
+    {
+      location: {
+        pathname: "/openclaw/home",
+        search: "?session=agent%3Aresearch%3Atelegram%3A12345&keep=yes",
+        hash: "#pane",
+      },
+      expected: {
+        pathname: "/openclaw/chat/research/telegram/12345",
+        search: "?keep=yes",
+        hash: "#pane",
+      },
+      basePath: "/openclaw",
+      namespace: "chat",
+      sessionKey: "agent:research:telegram:12345",
+    },
+    {
+      location: {
         pathname: "/chat",
         search: "?session=agent%3Aresearch%3Atelegram%3A12345",
         hash: "",
       },
       expected: { pathname: "/chat/research/telegram/12345", search: "", hash: "" },
+      basePath: "",
       namespace: "chat",
       sessionKey: "agent:research:telegram:12345",
     },
@@ -152,6 +249,7 @@ describe("resolveInitialApplicationLocation", () => {
         hash: "",
       },
       expected: { pathname: "/dashboard/research/telegram/12345", search: "", hash: "" },
+      basePath: "",
       namespace: "dashboard",
       sessionKey: "agent:research:telegram:12345",
     },
@@ -162,6 +260,7 @@ describe("resolveInitialApplicationLocation", () => {
         hash: "",
       },
       expected: { pathname: "/chat/research/~key/release-deadbeef", search: "", hash: "" },
+      basePath: "",
       namespace: "chat",
       sessionKey: "agent:research:release-deadbeef",
     },
@@ -169,7 +268,7 @@ describe("resolveInitialApplicationLocation", () => {
     const subscribe = vi.fn(() => () => undefined);
     const resolved = await resolveInitialApplicationLocation({
       location: testCase.location,
-      basePath: "",
+      basePath: testCase.basePath,
       sessionKey: "agent:main:main",
       gateway: {
         snapshot: { phase: "connecting", client: null, hello: null },
@@ -180,7 +279,7 @@ describe("resolveInitialApplicationLocation", () => {
     });
 
     expect(resolved).toEqual(testCase.expected);
-    expect(sessionRefFromPath(resolved.pathname, "", "main")).toMatchObject({
+    expect(sessionRefFromPath(resolved.pathname, testCase.basePath, "main")).toMatchObject({
       namespace: testCase.namespace,
       kind: "literal",
       sessionKey: testCase.sessionKey,

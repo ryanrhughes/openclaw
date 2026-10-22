@@ -6,7 +6,7 @@ import { createStorageMock } from "../../test-helpers/storage.ts";
 import { persistFirstRunActivationReceipt } from "./first-run-activation-receipt.ts";
 import { isDefaultChatLanding, startModelSetupFirstRunRedirectAfterLocation } from "./first-run.ts";
 
-const defaultLanding = { pathname: "/chat/main", search: "", hash: "" };
+const defaultLanding = { pathname: "/home", search: "", hash: "" };
 
 async function startRedirect(
   context: ApplicationContext,
@@ -84,9 +84,13 @@ describe("model setup first-run redirect", () => {
     vi.unstubAllGlobals();
   });
 
-  it("recognizes default chat landings without accepting session deep links", () => {
+  it("recognizes Home and default chat landings without accepting session deep links", () => {
     const cases = [
       ["/", "", "", "", true],
+      ["/home", "", "", "", true],
+      ["/home", "?session=agent%3Amain%3Amain", "", "", false],
+      ["/openclaw/", "", "", "/openclaw", true],
+      ["/openclaw/home", "", "", "/openclaw", true],
       ["/chat", "", "", "", true],
       ["/chat", "?session=agent%3Amain%3Amain", "", "", false],
       ["/chat", "", "#session=agent%3Amain%3Amain", "", false],

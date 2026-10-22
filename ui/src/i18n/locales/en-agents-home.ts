@@ -5,8 +5,8 @@ const enAgentsHome = {
   agentsHome: {
     manage: "Manage agents",
     create: "New agent",
-    openChat: "Open chat",
-    openMainChat: "Open main chat",
+    openChat: "Open shared Team chat",
+    openMainChat: "Open shared Team chat",
     allSessions: "All sessions",
     collapseOthers: "Collapse others",
     agentOptions: "Options for {agent}",

@@ -532,7 +532,6 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
     const entries = sidebarZone.entries.filter(
       (entry) => entry.type !== "route" || this.sidebarMenus.isRouteEnabled(entry.route),
     );
-    const showHome = this.sidebarAgentsMode !== "roster";
     return html`
       <aside
         class="sidebar"
@@ -569,15 +568,15 @@ class AppSidebar extends AppSidebarSessionNavigationElement implements SessionLi
                     this.sessionOrganizer.handleSidebarZoneDragLeave(event)}
                   @drop=${(event: DragEvent) => this.sessionOrganizer.handleSidebarZoneDrop(event)}
                 >
-                  ${showHome || entries.length === 0 ? renderAppSidebarPagesHead(this, renderAppSidebarHomeRow(this)) : nothing}
+                  ${renderAppSidebarPagesHead(this, renderAppSidebarHomeRow(this))}
                   <openclaw-mcp-app-catalog surface="sidebar"></openclaw-mcp-app-catalog>
-                  ${repeat(entries, serializeSidebarEntry, (entry, index) =>
+                  ${repeat(entries, serializeSidebarEntry, (entry) =>
                     renderAppSidebarZoneEntry(
                       this,
                       entry,
                       sidebarZone.sessionRows,
                       sidebarZone.pluginTabs,
-                      !showHome && index === 0,
+                      false,
                     ),
                   )}
                 </div>

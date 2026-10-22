@@ -5,7 +5,7 @@ import type {
   SessionsResolveResult,
 } from "../../../packages/gateway-protocol/src/index.js";
 import type { AgentsListResult } from "../api/types.ts";
-import { pathForRoute, pluginSlugCandidate } from "../app-route-paths.ts";
+import { pathForRoute } from "../app-route-paths.ts";
 import { routeIdFromPath, type ApplicationRouter } from "../app-routes.ts";
 import { pathForSession } from "../app-session-path-builder.ts";
 import { sessionRefFromPath } from "../app-session-route-paths.ts";
@@ -20,21 +20,19 @@ import {
   resolveUiDefaultAgentId,
 } from "../lib/sessions/session-key.ts";
 import { resolveChatSnapshotKey } from "../pages/chat/session-snapshot-key.ts";
-import { isDefaultChatLanding } from "../pages/model-setup/first-run.ts";
 import { newSessionLocationFromSearch } from "../pages/new-session/location.ts";
 import type { ApplicationContext, ApplicationGateway } from "./context.ts";
 import { waitForGatewayClient } from "./gateway-readiness.ts";
 import { releasedSessionQuery, resolvePersistedAgentId } from "./released-session-query.ts";
 import { loadGatewaySessionSelection } from "./settings.ts";
 
-// Saved selection only fills an implicit landing. Agent paths and plugin slug
-// candidates remain explicit, even before Gateway hello registers plugin tabs.
+// Bare Chat explicitly resumes the saved conversation. Home and route recovery
+// never inherit a remembered shared or private session.
 function isPersistedSessionLanding(location: RouteLocation, basePath: string): boolean {
+  const chatRoot = pathForRoute("chat", basePath);
   return (
     !new URLSearchParams(location.search + "&" + location.hash.slice(1)).has("session") &&
-    !pluginSlugCandidate(location.pathname, basePath) &&
-    (routeIdFromPath(location.pathname, basePath) === null ||
-      /^\/chat\/?$/u.test(location.pathname.slice(basePath.length)))
+    (location.pathname === chatRoot || location.pathname === `${chatRoot}/`)
   );
 }
 
@@ -149,7 +147,7 @@ export function resolveBootstrapModelCatalogTarget(
       ...(target.slugHint ? { slugHint: target.slugHint } : {}),
     };
   }
-  if (isDefaultChatLanding(location, basePath, routeIdFromPath)) {
+  if (isPersistedSessionLanding(location, basePath)) {
     const agentId =
       parseAgentSessionKey(selection.sessionKey)?.agentId ?? selection.selectedAgentId;
     return { sessionKey: selection.sessionKey, ...(agentId ? { agentId } : {}) };

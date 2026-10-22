@@ -13,6 +13,13 @@ The Control UI uses readable paths for pages and session links. A configured
 `gateway.controlUi.basePath` prefixes every path below. For example, `/chat/main`
 becomes `/openclaw/chat/main` when the base path is `/openclaw`.
 
+## Home
+
+`/home` and the application root open Home, with **New session** and **My recent
+sessions** for the signed-in person. Home does not reopen a saved conversation.
+An explicit session URL still opens that session; bare `/chat` resumes the saved
+conversation. The agent's shared Team chat remains at `/chat/<agentId>`.
+
 ## Session and dashboard URLs
 
 **Copy → Session link** uses the connected Gateway's public Control UI address

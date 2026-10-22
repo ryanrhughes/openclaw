@@ -22,23 +22,30 @@ background work reports back to it, and activity elsewhere flows up to it.
 
 ## Home
 
-In the web app, the main session is the **Home** page — the first entry in the
-sidebar. The identity row at the top is your agent (click it for the agent
-menu); Home is where you talk to it. Sessions that fork off the main
-conversation appear under **Threads**, group chats under **Groups**, and
-coding/CLI sessions under **Coding**.
+In the web app, **Home** is a landing page for starting a **New session** or
+resuming **My recent sessions**. The recent list includes conversations involving
+the signed-in person and follows the Gateway's access and personal visibility
+rules. It excludes the main conversation, archived sessions, and internal runs.
+Opening Home does not select or create a conversation.
 
-### Talk to Home while working
+The agent's main conversation remains shared and is labeled **Team chat**.
+Open it explicitly through the agent menu or the shared Team chat dock. Sessions
+that fork off the main conversation appear under **Threads**, group chats under
+**Groups**, and coding/CLI sessions under **Coding**.
 
-Select **Talk to your Home agent** in the sidebar footer (or press
-`Cmd/Ctrl+Shift+H`) to open Home beside your current page. The assistant
+<a id="talk-to-home-while-working" />
+
+### Talk to Team chat while working
+
+Select **Open shared Team chat** in the sidebar footer (or press
+`Cmd/Ctrl+Shift+H`) to open Team chat beside your current page. The assistant
 sidebar can dock on the right or bottom.
 It follows the agent selected in the sidebar's agent switcher, so there is one
 place to change agents. **Ask OpenClaw** remains a separate system-care
 conversation in the same sidebar.
 
-The dock uses your real Home conversation, including its history, tools,
-approvals, and message queue. **Open Home full page** opens that conversation
+The dock uses the shared main conversation, including its history, tools,
+approvals, and message queue. **Open shared Team chat full page** opens that conversation
 in the main area and temporarily hides its dock to avoid duplicate composers.
 
 Expand **Working on** to inspect the small reference snapshot accompanying your
